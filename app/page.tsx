@@ -1,37 +1,118 @@
-export default function Page() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6 text-neutral-400">
-      <div className="flex w-full max-w-md flex-col items-start gap-8">
-        <svg
-          fill="currentColor"
-          viewBox="0 0 147 70"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          className="size-10 text-white"
-        >
-          <path d="M56 50.2031V14H70V60.1562C70 65.5928 65.5928 70 60.1562 70C57.5605 70 54.9982 68.9992 53.1562 67.1573L0 14H19.7969L56 50.2031Z" />
-          <path d="M147 56H133V23.9531L100.953 56H133V70H96.6875C85.8144 70 77 61.1856 77 50.3125V14H91V46.1562L123.156 14H91V0H127.312C138.186 0 147 8.81439 147 19.6875V56Z" />
-        </svg>
+import { createClient } from '@/lib/supabase/server'
+import { Header } from '@/components/header'
+import { PlayerCard } from '@/components/player-card'
+import { AddPlayerDialog } from '@/components/add-player-dialog'
+import { Empty } from '@/components/ui/empty'
+import { Users } from 'lucide-react'
+import type { PlayerWithStats } from '@/lib/types'
 
-        <div className="space-y-3">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-white">
-            To get started, describe what you want to build.
-          </h1>
-          <p className="text-pretty text-sm leading-relaxed text-neutral-500">
-            This is the default page for a fresh v0 project. Open the prompt and
-            tell v0 what to create, or browse the{' '}
-            <a
-              href="https://v0.app/templates"
-              target="_blank"
-              rel="noreferrer"
-              className="text-neutral-300 underline underline-offset-4 hover:text-white"
+export const revalidate = 0
+
+async function getPlayers(): Promise<PlayerWithStats[]> {
+  const supabase = await createClient()
+  
+  const { data: players, error } = await supabase
+    .from('players')
+    .select(`
+      *,
+      stats:player_stats(*),
+      decks(*)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching players:', error)
+    return []
+  }
+
+  // Transform the data to match our types
+  return (players || []).map(player => ({
+    ...player,
+    stats: Array.isArray(player.stats) ? player.stats[0] || null : player.stats,
+    decks: player.decks || [],
+  }))
+}
+
+function sortPlayersByWins(players: PlayerWithStats[]): PlayerWithStats[] {
+  return [...players].sort((a, b) => {
+    const aWins = a.stats?.total_wins ?? 0
+    const bWins = b.stats?.total_wins ?? 0
+    return bWins - aWins
+  })
+}
+
+export default async function HomePage() {
+  const players = await getPlayers()
+  const rankedPlayers = sortPlayersByWins(players)
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      {/* Hero Section */}
+      <section className="relative border-b border-primary/20">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+        <div className="container mx-auto px-4 py-12 relative">
+          <div className="max-w-2xl">
+            <h1 
+              className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground mb-4"
+              style={{ fontFamily: 'var(--font-orbitron)' }}
             >
-              Community
-            </a>{' '}
-            for inspiration.
+              <span className="text-primary">DUEL</span> TRACKER
+            </h1>
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              Track your Yu-Gi-Oh duels, monitor win/loss records, and see who reigns supreme 
+              among your friends. Powered by KaibaCorp technology.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Players Section */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-primary" />
+            <h2 
+              className="text-xl font-bold text-foreground"
+              style={{ fontFamily: 'var(--font-orbitron)' }}
+            >
+              DUELISTS
+            </h2>
+            <span className="text-sm text-muted-foreground font-mono">
+              ({players.length})
+            </span>
+          </div>
+          <AddPlayerDialog />
+        </div>
+
+        {players.length === 0 ? (
+          <Empty
+            title="No Duelists Registered"
+            description="Add your first duelist to start tracking duels and stats."
+            className="py-16"
+          />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {rankedPlayers.map((player, index) => (
+              <PlayerCard 
+                key={player.id} 
+                player={player} 
+                rank={index + 1}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-primary/20 mt-auto">
+        <div className="container mx-auto px-4 py-6">
+          <p className="text-center text-sm text-muted-foreground">
+            <span style={{ fontFamily: 'var(--font-orbitron)' }}>KAIBACORP</span> Duel Tracking System v1.0
           </p>
         </div>
-      </div>
-    </main>
+      </footer>
+    </div>
   )
 }
