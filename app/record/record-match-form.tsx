@@ -32,6 +32,7 @@ interface Participant {
   deckId: string | null
   teamNumber: number | null
   isWinner: boolean
+  placement: number | null
 }
 
 const MATCH_TYPES: { value: MatchType; label: string; icon: React.ReactNode; minPlayers: number }[] = [
@@ -43,8 +44,8 @@ const MATCH_TYPES: { value: MatchType; label: string; icon: React.ReactNode; min
 export function RecordMatchForm({ players }: RecordMatchFormProps) {
   const [matchType, setMatchType] = useState<MatchType>('1v1')
   const [participants, setParticipants] = useState<Participant[]>([
-    { playerId: '', deckId: null, teamNumber: 1, isWinner: false },
-    { playerId: '', deckId: null, teamNumber: 2, isWinner: false },
+    { playerId: '', deckId: null, teamNumber: 1, isWinner: false, placement: null },
+    { playerId: '', deckId: null, teamNumber: 2, isWinner: false, placement: null },
   ])
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -57,7 +58,8 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
       playerId: '', 
       deckId: null, 
       teamNumber: matchType === 'tag_team' ? 1 : null,
-      isWinner: false 
+      isWinner: false,
+      placement: null,
     }])
   }
 
@@ -98,23 +100,24 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
     
     if (type === '1v1') {
       setParticipants([
-        { playerId: '', deckId: null, teamNumber: 1, isWinner: false },
-        { playerId: '', deckId: null, teamNumber: 2, isWinner: false },
+        { playerId: '', deckId: null, teamNumber: 1, isWinner: false, placement: null },
+        { playerId: '', deckId: null, teamNumber: 2, isWinner: false, placement: null },
       ])
     } else if (type === 'tag_team') {
       setParticipants([
-        { playerId: '', deckId: null, teamNumber: 1, isWinner: false },
-        { playerId: '', deckId: null, teamNumber: 1, isWinner: false },
-        { playerId: '', deckId: null, teamNumber: 2, isWinner: false },
-        { playerId: '', deckId: null, teamNumber: 2, isWinner: false },
+        { playerId: '', deckId: null, teamNumber: 1, isWinner: false, placement: null },
+        { playerId: '', deckId: null, teamNumber: 1, isWinner: false, placement: null },
+        { playerId: '', deckId: null, teamNumber: 2, isWinner: false, placement: null },
+        { playerId: '', deckId: null, teamNumber: 2, isWinner: false, placement: null },
       ])
     } else {
-      // Free for all - start with 3 players
-      setParticipants(Array.from({ length: Math.max(minPlayers, participants.length) }, () => ({
+      // Free for all - start with 3 players, auto-assign placements
+      setParticipants(Array.from({ length: Math.max(minPlayers, participants.length) }, (_, i) => ({
         playerId: '',
         deckId: null,
         teamNumber: null,
         isWinner: false,
+        placement: i + 1,
       })))
     }
   }
@@ -131,8 +134,26 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
 
     const hasWinner = filledParticipants.some(p => p.isWinner)
     if (!hasWinner) {
-      toast.error('Please select at least one winner')
+      if (matchType === 'free_for_all') {
+        toast.error('Please assign placements to all duelists')
+      } else {
+        toast.error('Please select at least one winner')
+      }
       return
+    }
+
+    // For FFA, validate all placements are set
+    if (matchType === 'free_for_all') {
+      const placements = filledParticipants.map(p => p.placement).filter(Boolean)
+      if (placements.length !== filledParticipants.length) {
+        toast.error('Please assign placements to all duelists')
+        return
+      }
+      const uniquePlacements = new Set(placements)
+      if (uniquePlacements.size !== placements.length) {
+        toast.error('Each duelist must have a unique placement')
+        return
+      }
     }
 
     setLoading(true)
@@ -158,6 +179,7 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
         deck_id: p.deckId,
         team_number: p.teamNumber,
         is_winner: p.isWinner,
+        placement: matchType === 'free_for_all' ? p.placement : null,
       }))
 
       const { error: participantsError } = await supabase
@@ -352,43 +374,62 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`winner-${index}`}
-                        checked={participant.isWinner}
-                        onCheckedChange={(checked) => {
-                          if (matchType === 'tag_team') {
-                            // For tag team, set all same team members as winners
-                            const newParticipants = participants.map((p, i) => ({
-                              ...p,
-                              isWinner: p.teamNumber === participant.teamNumber ? !!checked : false
-                            }))
-                            setParticipants(newParticipants)
-                          } else if (matchType === '1v1') {
-                            // For 1v1, only one winner
-                            const newParticipants = participants.map((p, i) => ({
-                              ...p,
-                              isWinner: i === index ? !!checked : false
-                            }))
-                            setParticipants(newParticipants)
-                          } else {
-                            // FFA can have one winner
-                            const newParticipants = participants.map((p, i) => ({
-                              ...p,
-                              isWinner: i === index ? !!checked : false
-                            }))
-                            setParticipants(newParticipants)
-                          }
-                        }}
-                      />
-                      <Label 
-                        htmlFor={`winner-${index}`} 
-                        className="text-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Trophy className="h-4 w-4 text-yellow-500" />
-                        Winner
-                      </Label>
-                    </div>
+                    {matchType === 'free_for_all' && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Placement</Label>
+                        <Select
+                          value={String(participant.placement || '')}
+                          onValueChange={(value) => updateParticipant(index, { 
+                            placement: parseInt(value),
+                            isWinner: parseInt(value) === 1
+                          })}
+                        >
+                          <SelectTrigger className="bg-input border-border">
+                            <SelectValue placeholder="Select placement..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: participants.length }, (_, i) => (
+                              <SelectItem key={i + 1} value={String(i + 1)}>
+                                {i + 1 === 1 ? '1st Place' : i + 1 === 2 ? '2nd Place' : i + 1 === 3 ? '3rd Place' : `${i + 1}th Place`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {matchType !== 'free_for_all' && (
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`winner-${index}`}
+                          checked={participant.isWinner}
+                          onCheckedChange={(checked) => {
+                            if (matchType === 'tag_team') {
+                              // For tag team, set all same team members as winners
+                              const newParticipants = participants.map((p, i) => ({
+                                ...p,
+                                isWinner: p.teamNumber === participant.teamNumber ? !!checked : false
+                              }))
+                              setParticipants(newParticipants)
+                            } else if (matchType === '1v1') {
+                              // For 1v1, only one winner
+                              const newParticipants = participants.map((p, i) => ({
+                                ...p,
+                                isWinner: i === index ? !!checked : false
+                              }))
+                              setParticipants(newParticipants)
+                            }
+                          }}
+                        />
+                        <Label 
+                          htmlFor={`winner-${index}`} 
+                          className="text-sm flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Trophy className="h-4 w-4 text-yellow-500" />
+                          Winner
+                        </Label>
+                      </div>
+                    )}
                   </div>
 
                   {participants.length > currentMatchType.minPlayers && (

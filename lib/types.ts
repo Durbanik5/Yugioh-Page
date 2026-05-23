@@ -32,6 +32,7 @@ export interface MatchParticipant {
   deck_id: string | null
   team_number: number | null
   is_winner: boolean
+  placement: number | null
 }
 
 export interface PlayerStats {
