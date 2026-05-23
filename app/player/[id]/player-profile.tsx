@@ -27,6 +27,7 @@ import {
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AddDeckDialog } from '@/components/add-deck-dialog'
+import { DeckBuildViewer } from '@/components/deck-build-viewer'
 import type { PlayerWithStats, MatchWithParticipants } from '@/lib/types'
 
 interface PlayerProfileProps {
@@ -273,26 +274,7 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {player.decks.map((deck) => (
-                <Card key={deck.id} className={`bg-card border-border ${deck.is_active ? 'ring-1 ring-primary/50' : ''}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-foreground flex items-center gap-2">
-                          {deck.name}
-                          {deck.is_active && (
-                            <Badge variant="outline" className="text-xs border-primary text-primary">Active</Badge>
-                          )}
-                        </h3>
-                        {deck.archetype && (
-                          <p className="text-sm text-muted-foreground">{deck.archetype}</p>
-                        )}
-                      </div>
-                    </div>
-                    {deck.description && (
-                      <p className="text-sm text-muted-foreground mt-2">{deck.description}</p>
-                    )}
-                  </CardContent>
-                </Card>
+                <DeckBuildViewer key={deck.id} deck={deck} />
               ))}
             </div>
           )}

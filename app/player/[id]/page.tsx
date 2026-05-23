@@ -18,7 +18,10 @@ async function getPlayer(id: string): Promise<PlayerWithStats | null> {
     .select(`
       *,
       stats:player_stats(*),
-      decks(*)
+      decks(
+        *,
+        cards:deck_cards(*)
+      )
     `)
     .eq('id', id)
     .single()
@@ -30,7 +33,10 @@ async function getPlayer(id: string): Promise<PlayerWithStats | null> {
   return {
     ...player,
     stats: Array.isArray(player.stats) ? player.stats[0] || null : player.stats,
-    decks: player.decks || [],
+    decks: (player.decks || []).map((deck: any) => ({
+      ...deck,
+      cards: deck.cards || [],
+    })),
   }
 }
 

@@ -48,9 +48,22 @@ export interface PlayerStats {
   updated_at: string
 }
 
+export interface DeckCard {
+  id: string
+  deck_id: string
+  card_name: string
+  card_type: 'monster' | 'spell' | 'trap'
+  quantity: number
+  created_at: string
+}
+
+export interface DeckWithCards extends Deck {
+  cards: DeckCard[]
+}
+
 export interface PlayerWithStats extends Player {
   stats: PlayerStats | null
-  decks: Deck[]
+  decks: DeckWithCards[]
 }
 
 export interface MatchWithParticipants extends Match {
