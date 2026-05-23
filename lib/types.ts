@@ -54,6 +54,7 @@ export interface DeckCard {
   deck_id: string
   card_name: string
   card_type: 'monster' | 'spell' | 'trap'
+  deck_category: 'main' | 'extra' | 'side'
   quantity: number
   created_at: string
 }

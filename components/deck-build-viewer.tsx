@@ -26,10 +26,18 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { DeckWithCards, DeckCard } from '@/lib/types'
+
+type DeckCategory = 'main' | 'extra' | 'side'
 
 interface DeckBuildViewerProps {
   deck: DeckWithCards
@@ -40,15 +48,29 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [cards, setCards] = useState<DeckCard[]>(deck.cards || [])
-  const [newCard, setNewCard] = useState({ name: '', type: 'monster' as const, quantity: 1 })
+  const [newCard, setNewCard] = useState({ 
+    name: '', 
+    type: 'monster' as 'monster' | 'spell' | 'trap', 
+    category: 'main' as DeckCategory,
+    quantity: 1 
+  })
   const [adding, setAdding] = useState(false)
+  const [activeTab, setActiveTab] = useState<DeckCategory>('main')
   const router = useRouter()
 
-  const monsters = cards.filter(c => c.card_type === 'monster')
-  const spells = cards.filter(c => c.card_type === 'spell')
-  const traps = cards.filter(c => c.card_type === 'trap')
+  // Filter cards by deck category
+  const mainDeckCards = cards.filter(c => !c.deck_category || c.deck_category === 'main')
+  const extraDeckCards = cards.filter(c => c.deck_category === 'extra')
+  const sideDeckCards = cards.filter(c => c.deck_category === 'side')
+
+  // Further filter by card type within each category
+  const getCardsByType = (categoryCards: DeckCard[], type: string) => 
+    categoryCards.filter(c => c.card_type === type)
 
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0)
+  const mainDeckTotal = mainDeckCards.reduce((sum, c) => sum + c.quantity, 0)
+  const extraDeckTotal = extraDeckCards.reduce((sum, c) => sum + c.quantity, 0)
+  const sideDeckTotal = sideDeckCards.reduce((sum, c) => sum + c.quantity, 0)
 
   const handleAddCard = async () => {
     if (!newCard.name.trim()) {
@@ -60,9 +82,11 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
     const supabase = createClient()
 
     try {
-      // Check if card already exists in deck
+      // Check if card already exists in deck with same category
       const existingCard = cards.find(
-        c => c.card_name.toLowerCase() === newCard.name.trim().toLowerCase() && c.card_type === newCard.type
+        c => c.card_name.toLowerCase() === newCard.name.trim().toLowerCase() && 
+             c.card_type === newCard.type &&
+             (c.deck_category || 'main') === newCard.category
       )
 
       if (existingCard) {
@@ -87,6 +111,7 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
             deck_id: deck.id,
             card_name: newCard.name.trim(),
             card_type: newCard.type,
+            deck_category: newCard.category,
             quantity: newCard.quantity
           })
           .select()
@@ -95,10 +120,10 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
         if (error) throw error
 
         setCards([...cards, data])
-        toast.success(`Added ${newCard.name} to deck`)
+        toast.success(`Added ${newCard.name} to ${newCard.category === 'main' ? 'Main' : newCard.category === 'extra' ? 'Extra' : 'Side'} Deck`)
       }
 
-      setNewCard({ name: '', type: 'monster', quantity: 1 })
+      setNewCard({ name: '', type: 'monster', category: activeTab, quantity: 1 })
       setAddDialogOpen(false)
       router.refresh()
     } catch (error) {
@@ -126,15 +151,6 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
     } catch (error) {
       console.error('Error removing card:', error)
       toast.error('Failed to remove card')
-    }
-  }
-
-  const getCardTypeIcon = (type: string) => {
-    switch (type) {
-      case 'monster': return <Sparkles className="h-4 w-4 text-yellow-400" />
-      case 'spell': return <Zap className="h-4 w-4 text-green-400" />
-      case 'trap': return <Shield className="h-4 w-4 text-purple-400" />
-      default: return null
     }
   }
 
@@ -194,6 +210,29 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
     </div>
   )
 
+  const DeckCategoryContent = ({ categoryCards }: { categoryCards: DeckCard[] }) => (
+    <div className="space-y-4">
+      <CardSection 
+        title="Monsters" 
+        icon={<Sparkles className="h-4 w-4 text-yellow-400" />}
+        sectionCards={getCardsByType(categoryCards, 'monster')}
+        color={getCardTypeColor('monster')}
+      />
+      <CardSection 
+        title="Spells" 
+        icon={<Zap className="h-4 w-4 text-green-400" />}
+        sectionCards={getCardsByType(categoryCards, 'spell')}
+        color={getCardTypeColor('spell')}
+      />
+      <CardSection 
+        title="Traps" 
+        icon={<Shield className="h-4 w-4 text-purple-400" />}
+        sectionCards={getCardsByType(categoryCards, 'trap')}
+        color={getCardTypeColor('trap')}
+      />
+    </div>
+  )
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={`bg-card border-border ${deck.is_active ? 'ring-1 ring-primary/50' : ''}`}>
@@ -225,9 +264,18 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
                 </div>
               )}
             </div>
-            <Badge variant="secondary" className="text-xs">
-              {totalCards} cards
-            </Badge>
+            <div className="flex flex-col items-end gap-1">
+              <Badge variant="secondary" className="text-xs">
+                {totalCards} total
+              </Badge>
+              <div className="flex gap-1 text-xs text-muted-foreground">
+                <span>{mainDeckTotal}M</span>
+                <span>/</span>
+                <span>{extraDeckTotal}E</span>
+                <span>/</span>
+                <span>{sideDeckTotal}S</span>
+              </div>
+            </div>
           </div>
           {deck.description && (
             <p className="text-sm text-muted-foreground mt-1">{deck.description}</p>
@@ -242,31 +290,49 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
             </Button>
           </CollapsibleTrigger>
 
-          <CollapsibleContent className="pt-4 space-y-4">
-            <CardSection 
-              title="Monsters" 
-              icon={<Sparkles className="h-4 w-4 text-yellow-400" />}
-              sectionCards={monsters}
-              color={getCardTypeColor('monster')}
-            />
-            <CardSection 
-              title="Spells" 
-              icon={<Zap className="h-4 w-4 text-green-400" />}
-              sectionCards={spells}
-              color={getCardTypeColor('spell')}
-            />
-            <CardSection 
-              title="Traps" 
-              icon={<Shield className="h-4 w-4 text-purple-400" />}
-              sectionCards={traps}
-              color={getCardTypeColor('trap')}
-            />
+          <CollapsibleContent className="pt-4">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DeckCategory)} className="w-full">
+              <TabsList className="w-full grid grid-cols-3 mb-4">
+                <TabsTrigger value="main" className="flex items-center gap-1.5 text-xs">
+                  <Layers className="h-3 w-3" />
+                  Main
+                  <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{mainDeckTotal}</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="extra" className="flex items-center gap-1.5 text-xs">
+                  <Star className="h-3 w-3" />
+                  Extra
+                  <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{extraDeckTotal}</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="side" className="flex items-center gap-1.5 text-xs">
+                  <RefreshCw className="h-3 w-3" />
+                  Side
+                  <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{sideDeckTotal}</Badge>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="main" className="mt-0">
+                <DeckCategoryContent categoryCards={mainDeckCards} />
+              </TabsContent>
+              
+              <TabsContent value="extra" className="mt-0">
+                <DeckCategoryContent categoryCards={extraDeckCards} />
+              </TabsContent>
+              
+              <TabsContent value="side" className="mt-0">
+                <DeckCategoryContent categoryCards={sideDeckCards} />
+              </TabsContent>
+            </Tabs>
 
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full mt-4 border-primary/30 text-primary hover:bg-primary/10">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-4 border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={() => setNewCard(prev => ({ ...prev, category: activeTab }))}
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Card
+                  Add Card to {activeTab === 'main' ? 'Main' : activeTab === 'extra' ? 'Extra' : 'Side'} Deck
                 </Button>
               </DialogTrigger>
               <DialogContent className="bg-card border-primary/30">
@@ -284,6 +350,38 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
                       onChange={(e) => setNewCard({ ...newCard, name: e.target.value })}
                       className="bg-secondary border-border"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Deck Category</Label>
+                    <Select 
+                      value={newCard.category} 
+                      onValueChange={(value: DeckCategory) => setNewCard({ ...newCard, category: value })}
+                    >
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="main">
+                          <span className="flex items-center gap-2">
+                            <Layers className="h-4 w-4 text-primary" />
+                            Main Deck
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="extra">
+                          <span className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-amber-400" />
+                            Extra Deck
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="side">
+                          <span className="flex items-center gap-2">
+                            <RefreshCw className="h-4 w-4 text-cyan-400" />
+                            Side Deck
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
