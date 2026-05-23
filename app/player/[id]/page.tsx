@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/header'
 import { PlayerProfile } from './player-profile'
-import type { PlayerWithStats, MatchWithParticipants } from '@/lib/types'
+import type { PlayerWithStats, MatchWithParticipants, Player } from '@/lib/types'
 
 export const revalidate = 0
 
@@ -55,7 +55,7 @@ async function getPlayerMatches(playerId: string): Promise<MatchWithParticipants
 
   const matchIds = participations.map(p => p.match_id)
 
-  // Get full match data
+  // Get full match data (no limit - we need all for stats)
   const { data: matches, error: matchError } = await supabase
     .from('matches')
     .select(`
@@ -68,7 +68,6 @@ async function getPlayerMatches(playerId: string): Promise<MatchWithParticipants
     `)
     .in('id', matchIds)
     .order('played_at', { ascending: false })
-    .limit(10)
 
   if (matchError) {
     console.error('Error fetching matches:', matchError)
@@ -76,6 +75,20 @@ async function getPlayerMatches(playerId: string): Promise<MatchWithParticipants
   }
 
   return (matches || []) as MatchWithParticipants[]
+}
+
+async function getAllPlayers() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('players')
+    .select('*')
+  
+  if (error) {
+    console.error('Error fetching players:', error)
+    return []
+  }
+  
+  return data || []
 }
 
 export default async function PlayerPage({ params }: PlayerPageProps) {
@@ -87,11 +100,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   }
 
   const matches = await getPlayerMatches(id)
+  const allPlayers = await getAllPlayers()
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <PlayerProfile player={player} matches={matches} />
+      <PlayerProfile player={player} matches={matches} allPlayers={allPlayers} />
     </div>
   )
 }

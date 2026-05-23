@@ -27,15 +27,16 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { DeckWithCards, DeckCard } from '@/lib/types'
 
 interface DeckBuildViewerProps {
   deck: DeckWithCards
+  record?: { wins: number; losses: number }
 }
 
-export function DeckBuildViewer({ deck }: DeckBuildViewerProps) {
+export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [cards, setCards] = useState<DeckCard[]>(deck.cards || [])
@@ -207,6 +208,21 @@ export function DeckBuildViewer({ deck }: DeckBuildViewerProps) {
               </CardTitle>
               {deck.archetype && (
                 <p className="text-sm text-muted-foreground">{deck.archetype}</p>
+              )}
+              {record && (record.wins > 0 || record.losses > 0) && (
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="flex items-center gap-1 text-sm">
+                    <Trophy className="h-3 w-3 text-green-500" />
+                    <span className="text-green-500 font-medium">{record.wins}W</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-sm">
+                    <Target className="h-3 w-3 text-red-500" />
+                    <span className="text-red-500 font-medium">{record.losses}L</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ({record.wins + record.losses > 0 ? Math.round((record.wins / (record.wins + record.losses)) * 100) : 0}% WR)
+                  </span>
+                </div>
               )}
             </div>
             <Badge variant="secondary" className="text-xs">

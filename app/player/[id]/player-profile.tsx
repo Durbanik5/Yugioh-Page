@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -22,26 +22,225 @@ import {
 import { toast } from 'sonner'
 import { 
   Trophy, Target, Percent, Swords, Users, 
-  ChevronLeft, Trash2, Plus, Layers
+  ChevronLeft, Trash2, Plus, Layers, Medal,
+  TrendingUp, TrendingDown, Minus
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
-import type { PlayerWithStats, MatchWithParticipants } from '@/lib/types'
+import type { PlayerWithStats, MatchWithParticipants, Player, Deck } from '@/lib/types'
 
 interface PlayerProfileProps {
   player: PlayerWithStats
   matches: MatchWithParticipants[]
+  allPlayers: Player[]
 }
 
-export function PlayerProfile({ player, matches }: PlayerProfileProps) {
+// Helper to get ordinal suffix
+function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
+// Calculate deck records from matches
+function calculateDeckRecords(matches: MatchWithParticipants[], playerId: string, decks: Deck[]) {
+  const deckStats: Record<string, { wins: number; losses: number }> = {}
+  
+  decks.forEach(deck => {
+    deckStats[deck.id] = { wins: 0, losses: 0 }
+  })
+  
+  matches.forEach(match => {
+    const playerParticipant = match.participants.find(p => p.player_id === playerId)
+    if (!playerParticipant || !playerParticipant.deck_id) return
+    
+    const deckId = playerParticipant.deck_id
+    if (!deckStats[deckId]) {
+      deckStats[deckId] = { wins: 0, losses: 0 }
+    }
+    
+    if (playerParticipant.is_winner) {
+      deckStats[deckId].wins++
+    } else {
+      deckStats[deckId].losses++
+    }
+  })
+  
+  return deckStats
+}
+
+// Calculate 1v1 records against each opponent
+function calculate1v1Records(matches: MatchWithParticipants[], playerId: string, allPlayers: Player[]) {
+  const records: Record<string, {
+    opponent: Player
+    wins: number
+    losses: number
+    matchups: Array<{
+      playerDeck: string | null
+      opponentDeck: string | null
+      playerWon: boolean
+      date: string
+    }>
+  }> = {}
+  
+  const oneVOneMatches = matches.filter(m => m.match_type === '1v1')
+  
+  oneVOneMatches.forEach(match => {
+    const playerParticipant = match.participants.find(p => p.player_id === playerId)
+    const opponentParticipant = match.participants.find(p => p.player_id !== playerId)
+    
+    if (!playerParticipant || !opponentParticipant) return
+    
+    const opponentId = opponentParticipant.player_id
+    const opponent = allPlayers.find(p => p.id === opponentId)
+    if (!opponent) return
+    
+    if (!records[opponentId]) {
+      records[opponentId] = {
+        opponent,
+        wins: 0,
+        losses: 0,
+        matchups: []
+      }
+    }
+    
+    if (playerParticipant.is_winner) {
+      records[opponentId].wins++
+    } else {
+      records[opponentId].losses++
+    }
+    
+    records[opponentId].matchups.push({
+      playerDeck: playerParticipant.deck?.name || null,
+      opponentDeck: opponentParticipant.deck?.name || null,
+      playerWon: playerParticipant.is_winner,
+      date: match.played_at
+    })
+  })
+  
+  return Object.values(records).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses))
+}
+
+// Calculate FFA placement history
+function calculateFFAStats(matches: MatchWithParticipants[], playerId: string) {
+  const ffaMatches = matches.filter(m => m.match_type === 'free_for_all')
+  const placements: Record<number, number> = {}
+  let totalMatches = 0
+  
+  const matchHistory: Array<{
+    placement: number
+    totalPlayers: number
+    deck: string | null
+    date: string
+  }> = []
+  
+  ffaMatches.forEach(match => {
+    const playerParticipant = match.participants.find(p => p.player_id === playerId)
+    if (!playerParticipant) return
+    
+    const placement = playerParticipant.placement
+    if (placement) {
+      placements[placement] = (placements[placement] || 0) + 1
+      totalMatches++
+      
+      matchHistory.push({
+        placement,
+        totalPlayers: match.participants.length,
+        deck: playerParticipant.deck?.name || null,
+        date: match.played_at
+      })
+    }
+  })
+  
+  // Calculate average placement
+  let totalPlacements = 0
+  Object.entries(placements).forEach(([place, count]) => {
+    totalPlacements += parseInt(place) * count
+  })
+  const avgPlacement = totalMatches > 0 ? totalPlacements / totalMatches : 0
+  
+  return {
+    placements,
+    totalMatches,
+    avgPlacement,
+    matchHistory: matchHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }
+}
+
+// Calculate tag team records with partners
+function calculateTagTeamRecords(matches: MatchWithParticipants[], playerId: string, allPlayers: Player[]) {
+  const records: Record<string, {
+    partner: Player
+    wins: number
+    losses: number
+    matchHistory: Array<{
+      opponents: string[]
+      won: boolean
+      date: string
+    }>
+  }> = {}
+  
+  const tagMatches = matches.filter(m => m.match_type === 'tag_team')
+  
+  tagMatches.forEach(match => {
+    const playerParticipant = match.participants.find(p => p.player_id === playerId)
+    if (!playerParticipant) return
+    
+    const playerTeam = playerParticipant.team_number
+    const partners = match.participants.filter(
+      p => p.team_number === playerTeam && p.player_id !== playerId
+    )
+    const opponents = match.participants.filter(p => p.team_number !== playerTeam)
+    
+    partners.forEach(partnerParticipant => {
+      const partnerId = partnerParticipant.player_id
+      const partner = allPlayers.find(p => p.id === partnerId)
+      if (!partner) return
+      
+      if (!records[partnerId]) {
+        records[partnerId] = {
+          partner,
+          wins: 0,
+          losses: 0,
+          matchHistory: []
+        }
+      }
+      
+      if (playerParticipant.is_winner) {
+        records[partnerId].wins++
+      } else {
+        records[partnerId].losses++
+      }
+      
+      records[partnerId].matchHistory.push({
+        opponents: opponents.map(o => {
+          const player = allPlayers.find(p => p.id === o.player_id)
+          return player?.nickname || 'Unknown'
+        }),
+        won: playerParticipant.is_winner,
+        date: match.played_at
+      })
+    })
+  })
+  
+  return Object.values(records).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses))
+}
+
+export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProps) {
   const [deleting, setDeleting] = useState(false)
   const router = useRouter()
   
   const stats = player.stats
   const totalGames = (stats?.total_wins ?? 0) + (stats?.total_losses ?? 0)
   const winRate = totalGames > 0 ? ((stats?.total_wins ?? 0) / totalGames) * 100 : 0
+
+  // Calculate detailed records
+  const deckRecords = useMemo(() => calculateDeckRecords(matches, player.id, player.decks), [matches, player.id, player.decks])
+  const oneVOneRecords = useMemo(() => calculate1v1Records(matches, player.id, allPlayers), [matches, player.id, allPlayers])
+  const ffaStats = useMemo(() => calculateFFAStats(matches, player.id), [matches, player.id])
+  const tagTeamRecords = useMemo(() => calculateTagTeamRecords(matches, player.id, allPlayers), [matches, player.id, allPlayers])
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -83,6 +282,9 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
       default: return type
     }
   }
+
+  // Get recent matches for display (limit to 10)
+  const recentMatches = matches.slice(0, 10)
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -186,7 +388,8 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
         </TabsList>
 
         {/* Stats Tab */}
-        <TabsContent value="stats" className="space-y-4">
+        <TabsContent value="stats" className="space-y-6">
+          {/* Overview Cards */}
           <div className="grid gap-4 sm:grid-cols-3">
             {/* 1v1 Stats */}
             <Card className="bg-card border-border">
@@ -257,6 +460,233 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
               </CardContent>
             </Card>
           </div>
+
+          {/* 1v1 Detailed Records */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Swords className="h-5 w-5 text-primary" />
+                1v1 Record vs Opponents
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {oneVOneRecords.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No 1v1 matches recorded yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {oneVOneRecords.map((record) => (
+                    <div key={record.opponent.id} className="border border-border rounded-lg p-4 bg-background/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border border-primary/30">
+                            <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
+                              {record.opponent.nickname.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-foreground">{record.opponent.nickname}</p>
+                            <p className="text-sm text-muted-foreground">{record.matchups.length} matches</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={record.wins > record.losses ? 'default' : record.wins < record.losses ? 'destructive' : 'secondary'} 
+                            className={`text-base px-3 py-1 ${record.wins > record.losses ? 'bg-green-600' : record.wins < record.losses ? 'bg-red-600' : ''}`}
+                          >
+                            {record.wins}-{record.losses}
+                          </Badge>
+                          {record.wins > record.losses && <TrendingUp className="h-5 w-5 text-green-500" />}
+                          {record.wins < record.losses && <TrendingDown className="h-5 w-5 text-red-500" />}
+                          {record.wins === record.losses && <Minus className="h-5 w-5 text-muted-foreground" />}
+                        </div>
+                      </div>
+                      
+                      {/* Deck matchups */}
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-2">Deck Matchup History:</p>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {record.matchups.slice(0, 5).map((matchup, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-2">
+                                {matchup.playerWon ? (
+                                  <Trophy className="h-3 w-3 text-yellow-500" />
+                                ) : (
+                                  <Swords className="h-3 w-3 text-red-500" />
+                                )}
+                                <span className={matchup.playerWon ? 'text-green-400' : 'text-red-400'}>
+                                  {matchup.playerDeck || 'No deck'}
+                                </span>
+                                <span className="text-muted-foreground">vs</span>
+                                <span className="text-muted-foreground">
+                                  {matchup.opponentDeck || 'No deck'}
+                                </span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(matchup.date).toLocaleDateString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* FFA Placement History */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 text-accent" />
+                Free-For-All Placements
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {ffaStats.totalMatches === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No FFA matches recorded yet.</p>
+              ) : (
+                <div className="space-y-6">
+                  {/* Placement Summary */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[1, 2, 3].map((place) => (
+                      <div key={place} className={`p-3 rounded-lg border ${
+                        place === 1 ? 'border-yellow-500/50 bg-yellow-500/10' :
+                        place === 2 ? 'border-gray-400/50 bg-gray-400/10' :
+                        'border-amber-700/50 bg-amber-700/10'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Medal className={`h-4 w-4 ${
+                            place === 1 ? 'text-yellow-500' :
+                            place === 2 ? 'text-gray-400' :
+                            'text-amber-700'
+                          }`} />
+                          <span className="text-sm font-medium text-foreground">{getOrdinal(place)}</span>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">{ffaStats.placements[place] || 0}</p>
+                      </div>
+                    ))}
+                    <div className="p-3 rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Target className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-foreground">Avg</span>
+                      </div>
+                      <p className="text-2xl font-bold text-foreground">{ffaStats.avgPlacement.toFixed(1)}</p>
+                    </div>
+                  </div>
+
+                  {/* Placement History */}
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Recent FFA Results:</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {ffaStats.matchHistory.slice(0, 10).map((match, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-background/50 border border-border">
+                          <div className="flex items-center gap-3">
+                            <Badge 
+                              variant={match.placement === 1 ? 'default' : 'secondary'} 
+                              className={`${
+                                match.placement === 1 ? 'bg-yellow-500 text-yellow-950' :
+                                match.placement === 2 ? 'bg-gray-400 text-gray-950' :
+                                match.placement === 3 ? 'bg-amber-700 text-amber-50' : ''
+                              }`}
+                            >
+                              {getOrdinal(match.placement)}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              / {match.totalPlayers} players
+                            </span>
+                            {match.deck && (
+                              <span className="text-sm text-foreground">
+                                with <span className="text-primary">{match.deck}</span>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(match.date).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tag Team Partner Records */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Layers className="h-5 w-5 text-chart-3" />
+                Tag Team Partner Records
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tagTeamRecords.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No tag team matches recorded yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {tagTeamRecords.map((record) => (
+                    <div key={record.partner.id} className="border border-border rounded-lg p-4 bg-background/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border border-green-500/30">
+                            <AvatarFallback className="bg-green-500/20 text-green-400 text-sm font-bold">
+                              {record.partner.nickname.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-foreground">{record.partner.nickname}</p>
+                            <p className="text-sm text-muted-foreground">{record.matchHistory.length} matches together</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={record.wins > record.losses ? 'default' : record.wins < record.losses ? 'destructive' : 'secondary'} 
+                            className={`text-base px-3 py-1 ${record.wins > record.losses ? 'bg-green-600' : record.wins < record.losses ? 'bg-red-600' : ''}`}
+                          >
+                            {record.wins}-{record.losses}
+                          </Badge>
+                          {record.wins > record.losses && <TrendingUp className="h-5 w-5 text-green-500" />}
+                          {record.wins < record.losses && <TrendingDown className="h-5 w-5 text-red-500" />}
+                          {record.wins === record.losses && <Minus className="h-5 w-5 text-muted-foreground" />}
+                        </div>
+                      </div>
+                      
+                      {/* Match history */}
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-2">Recent Matches:</p>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {record.matchHistory.slice(0, 5).map((match, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-2">
+                                {match.won ? (
+                                  <Trophy className="h-3 w-3 text-yellow-500" />
+                                ) : (
+                                  <Swords className="h-3 w-3 text-red-500" />
+                                )}
+                                <span className={match.won ? 'text-green-400' : 'text-red-400'}>
+                                  {match.won ? 'Victory' : 'Defeat'}
+                                </span>
+                                <span className="text-muted-foreground">vs</span>
+                                <span className="text-muted-foreground">
+                                  {match.opponents.join(' & ')}
+                                </span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(match.date).toLocaleDateString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Decks Tab */}
@@ -274,7 +704,11 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {player.decks.map((deck) => (
-                <DeckBuildViewer key={deck.id} deck={deck} />
+                <DeckBuildViewer 
+                  key={deck.id} 
+                  deck={deck} 
+                  record={deckRecords[deck.id]}
+                />
               ))}
             </div>
           )}
@@ -282,7 +716,7 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
 
         {/* Matches Tab */}
         <TabsContent value="matches" className="space-y-4">
-          {matches.length === 0 ? (
+          {recentMatches.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
                 <p className="text-muted-foreground">No matches recorded yet.</p>
@@ -296,9 +730,10 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
             </Card>
           ) : (
             <div className="space-y-3">
-              {matches.map((match) => {
+              {recentMatches.map((match) => {
                 const playerParticipant = match.participants.find(p => p.player_id === player.id)
                 const isWinner = playerParticipant?.is_winner ?? false
+                const placement = playerParticipant?.placement
                 
                 return (
                   <Card key={match.id} className={`bg-card border-border ${isWinner ? 'border-l-2 border-l-green-500' : 'border-l-2 border-l-red-500'}`}>
@@ -309,9 +744,22 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
                             {getMatchTypeIcon(match.match_type)}
                             {getMatchTypeLabel(match.match_type)}
                           </Badge>
-                          <Badge variant={isWinner ? 'default' : 'secondary'} className={isWinner ? 'bg-green-600' : 'bg-red-600'}>
-                            {isWinner ? 'Victory' : 'Defeat'}
-                          </Badge>
+                          {match.match_type === 'free_for_all' && placement ? (
+                            <Badge 
+                              variant={placement === 1 ? 'default' : 'secondary'} 
+                              className={
+                                placement === 1 ? 'bg-yellow-500 text-yellow-950' :
+                                placement === 2 ? 'bg-gray-400 text-gray-950' :
+                                placement === 3 ? 'bg-amber-700 text-amber-50' : ''
+                              }
+                            >
+                              {getOrdinal(placement)} Place
+                            </Badge>
+                          ) : (
+                            <Badge variant={isWinner ? 'default' : 'secondary'} className={isWinner ? 'bg-green-600' : 'bg-red-600'}>
+                              {isWinner ? 'Victory' : 'Defeat'}
+                            </Badge>
+                          )}
                         </div>
                         <span className="text-sm text-muted-foreground">
                           {new Date(match.played_at).toLocaleDateString()}
@@ -321,7 +769,7 @@ export function PlayerProfile({ player, matches }: PlayerProfileProps) {
                         <span>vs </span>
                         {match.participants
                           .filter(p => p.player_id !== player.id)
-                          .map(p => p.player.nickname)
+                          .map(p => p.player?.nickname || 'Unknown')
                           .join(', ') || 'Unknown'}
                       </div>
                       {playerParticipant?.deck && (
