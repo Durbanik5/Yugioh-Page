@@ -17,7 +17,8 @@ import { toast } from 'sonner'
 import { 
   Radio, ArrowLeft, Users, Eye, Swords, Clock, Copy, 
   Play, Square, Plus, Minus, ChevronRight, Send, Trophy,
-  SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X
+  SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X,
+  Maximize2, Monitor
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase } from '@/lib/types'
@@ -25,6 +26,219 @@ import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRo
 interface RoomData extends DuelRoom {
   participants: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
   creator: Player | null
+}
+
+// Spectator Screen Component - The main visual display for the duel
+function SpectatorScreen({ 
+  room, 
+  duelists, 
+  currentTurnPlayer 
+}: { 
+  room: RoomData
+  duelists: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
+  currentTurnPlayer: (DuelRoomParticipant & { player: Player; deck: Deck | null }) | undefined
+}) {
+  const phases: TurnPhase[] = ['draw', 'standby', 'main', 'battle', 'end']
+  
+  if (room.status === 'waiting') {
+    return (
+      <div className="relative aspect-video bg-gradient-to-br from-background via-card to-background rounded-xl border-2 border-border overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="relative">
+              <Monitor className="h-20 w-20 mx-auto text-primary/50 animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground" style={{ fontFamily: 'var(--font-orbitron)' }}>
+              WAITING FOR DUELISTS
+            </h2>
+            <p className="text-muted-foreground">
+              {duelists.length}/2 duelists joined
+            </p>
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <span className="text-muted-foreground">Room Code:</span>
+              <span className="font-mono text-2xl text-primary font-bold tracking-wider">{room.room_code}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (room.status === 'finished') {
+    const winner = duelists.find(d => d.player_id === room.winner_id)
+    return (
+      <div className="relative aspect-video bg-gradient-to-br from-background via-card to-background rounded-xl border-2 border-primary/50 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/20 via-transparent to-transparent" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <Trophy className="h-24 w-24 text-yellow-500 mb-4" />
+          <h2 className="text-3xl font-bold text-foreground mb-2" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            DUEL FINISHED
+          </h2>
+          {winner ? (
+            <p className="text-2xl text-yellow-500 font-bold">
+              {winner.player.nickname} WINS!
+            </p>
+          ) : (
+            <p className="text-xl text-muted-foreground">No winner declared</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Active duel display
+  return (
+    <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl border-2 border-primary/30 overflow-hidden shadow-2xl shadow-primary/10">
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+      <div className="absolute inset-0 opacity-30" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2306b6d4' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      }} />
+      
+      {/* Turn and Phase Info - Top Center */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10">
+        <div className="bg-black/60 backdrop-blur-sm px-6 py-2 rounded-full border border-primary/50">
+          <span className="text-primary font-bold text-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            TURN {room.turn_count}
+          </span>
+        </div>
+        <div className="flex gap-1">
+          {phases.map((phase) => (
+            <div
+              key={phase}
+              className={`px-3 py-1 rounded text-xs font-medium uppercase transition-all ${
+                room.turn_phase === phase 
+                  ? 'bg-primary text-primary-foreground scale-110' 
+                  : 'bg-black/40 text-muted-foreground'
+              }`}
+            >
+              {phase}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Current Turn Player Indicator */}
+      {currentTurnPlayer && (
+        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-yellow-500/50 z-10">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-yellow-500 animate-pulse" />
+            <span className="text-yellow-500 font-medium text-sm">
+              {currentTurnPlayer.player.nickname}&apos;s Turn
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* VS Display */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="text-6xl font-black text-primary/20" style={{ fontFamily: 'var(--font-orbitron)' }}>
+          VS
+        </div>
+      </div>
+
+      {/* Duelists Display */}
+      <div className="absolute inset-0 flex items-center justify-around px-8">
+        {duelists.map((participant, index) => {
+          const isCurrentTurn = room.current_turn_player_id === participant.player_id
+          const lpPercentage = (participant.life_points / 8000) * 100
+          const isLowLp = participant.life_points <= 2000
+          const isMidLp = participant.life_points <= 4000 && participant.life_points > 2000
+          
+          return (
+            <div 
+              key={participant.id} 
+              className={`flex flex-col items-center transition-all duration-500 ${
+                isCurrentTurn ? 'scale-105' : 'scale-100 opacity-90'
+              }`}
+            >
+              {/* Player Avatar/Icon */}
+              <div className={`relative mb-4 ${isCurrentTurn ? 'animate-pulse' : ''}`}>
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold border-4 transition-all ${
+                  isCurrentTurn 
+                    ? 'border-primary bg-primary/20 text-primary shadow-lg shadow-primary/50' 
+                    : 'border-muted bg-muted/20 text-muted-foreground'
+                }`}>
+                  {participant.player.nickname.charAt(0).toUpperCase()}
+                </div>
+                {isCurrentTurn && (
+                  <div className="absolute -top-1 -right-1">
+                    <Zap className="h-6 w-6 text-yellow-500 animate-bounce" />
+                  </div>
+                )}
+              </div>
+
+              {/* Player Name */}
+              <h3 className={`text-xl font-bold mb-1 ${
+                isCurrentTurn ? 'text-primary' : 'text-foreground'
+              }`} style={{ fontFamily: 'var(--font-orbitron)' }}>
+                {participant.player.nickname}
+              </h3>
+
+              {/* Deck Name */}
+              {participant.deck && (
+                <p className="text-xs text-muted-foreground mb-3">
+                  {participant.deck.name}
+                </p>
+              )}
+
+              {/* Life Points Display */}
+              <div className="relative">
+                {/* LP Background glow effect */}
+                <div className={`absolute inset-0 blur-xl rounded-full ${
+                  isLowLp ? 'bg-red-500/30' : isMidLp ? 'bg-yellow-500/20' : 'bg-primary/20'
+                }`} />
+                
+                <div className={`relative px-8 py-4 rounded-xl border-2 backdrop-blur-sm ${
+                  isLowLp 
+                    ? 'border-red-500 bg-red-950/50' 
+                    : isMidLp 
+                    ? 'border-yellow-500 bg-yellow-950/50' 
+                    : 'border-primary bg-primary/10'
+                }`}>
+                  <div className={`text-5xl font-mono font-black tracking-tight ${
+                    isLowLp ? 'text-red-500' : isMidLp ? 'text-yellow-500' : 'text-primary'
+                  }`}>
+                    {participant.life_points.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-center text-muted-foreground mt-1 uppercase tracking-widest">
+                    Life Points
+                  </div>
+                </div>
+              </div>
+
+              {/* LP Bar */}
+              <div className="w-48 h-2 bg-muted/30 rounded-full mt-4 overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isLowLp ? 'bg-red-500' : isMidLp ? 'bg-yellow-500' : 'bg-primary'
+                  }`}
+                  style={{ width: `${lpPercentage}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Live Indicator */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full">
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+        </span>
+        <span className="text-xs font-medium text-red-400 uppercase tracking-wider">Live</span>
+      </div>
+
+      {/* Match Type Badge */}
+      <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full">
+        <span className="text-xs text-muted-foreground">
+          {room.match_type === '1v1' ? '1v1 Duel' : room.match_type === 'free_for_all' ? 'Free-For-All' : 'Tag Team'}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export default function DuelRoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +279,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_room_participants', filter: `room_id=eq.${id}` }, () => {
         fetchRoom()
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_room_events', filter: `room_id=eq.${id}` }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_room_events', filter: `room_id=eq.${id}` }, () => {
         fetchEvents()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_room_messages', filter: `room_id=eq.${id}` }, () => {
@@ -429,7 +643,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       <Header />
       <main className="container mx-auto px-4 py-4">
         {/* Top Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/live" className="flex items-center gap-2">
@@ -541,7 +755,6 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Button>
             )}
 
-            {/* End Duel button for host during active duel */}
             {room.status === 'active' && isHost && (
               <Button onClick={handleEndDuelNoWinner} variant="destructive">
                 <Square className="h-4 w-4 mr-2" />
@@ -549,7 +762,6 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Button>
             )}
 
-            {/* Leave Room button for participants (not host) */}
             {isParticipant && !isHost && room.status !== 'active' && (
               <Button onClick={handleLeaveRoom} variant="outline">
                 <LogOut className="h-4 w-4 mr-2" />
@@ -557,7 +769,6 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Button>
             )}
 
-            {/* Delete Room button for host when not active */}
             {isHost && room.status !== 'active' && (
               <Button onClick={handleDeleteRoom} variant="destructive" size="sm">
                 <X className="h-4 w-4 mr-2" />
@@ -567,83 +778,69 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          {/* Main Duel Area */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Stream Embed */}
-            {room.stream_url && (
-              <Card className="bg-card border-border overflow-hidden">
-                <div className="aspect-video bg-black flex items-center justify-center">
-                  {room.stream_url.includes('youtube') || room.stream_url.includes('youtu.be') ? (
-                    <iframe
-                      src={room.stream_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : room.stream_url.includes('twitch') ? (
-                    <iframe
-                      src={`https://player.twitch.tv/?channel=${room.stream_url.split('/').pop()}&parent=${window.location.hostname}`}
-                      className="w-full h-full"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <a href={room.stream_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      Open Stream Link
-                    </a>
-                  )}
+        {/* MAIN SPECTATOR SCREEN */}
+        <div className="mb-6">
+          <SpectatorScreen room={room} duelists={duelists} currentTurnPlayer={currentTurnPlayer} />
+        </div>
+
+        {/* Stream Embed (if available) */}
+        {room.stream_url && (
+          <Card className="bg-card border-border overflow-hidden mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Monitor className="h-4 w-4" />
+                Live Stream
+              </CardTitle>
+            </CardHeader>
+            <div className="aspect-video bg-black">
+              {room.stream_url.includes('youtube') || room.stream_url.includes('youtu.be') ? (
+                <iframe
+                  src={room.stream_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : room.stream_url.includes('twitch') ? (
+                <iframe
+                  src={`https://player.twitch.tv/?channel=${room.stream_url.split('/').pop()}&parent=${typeof window !== 'undefined' ? window.location.hostname : ''}`}
+                  className="w-full h-full"
+                  allowFullScreen
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <a href={room.stream_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    Open Stream Link
+                  </a>
                 </div>
-              </Card>
-            )}
+              )}
+            </div>
+          </Card>
+        )}
 
-            {/* Life Points Display */}
-            <Card className="bg-card border-border">
-              <CardContent className="p-6">
-                {room.status === 'active' && (
-                  <div className="flex items-center justify-center gap-2 mb-4 text-sm">
-                    <Badge variant="outline" className="border-primary text-primary">
-                      Turn {room.turn_count}
-                    </Badge>
-                    <Badge variant="outline">
-                      {currentTurnPlayer?.player.nickname}&apos;s turn
-                    </Badge>
-                    <Badge variant="secondary" className="capitalize">
-                      {room.turn_phase} Phase
-                    </Badge>
-                  </div>
-                )}
-
-                <div className={`grid gap-4 ${duelists.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-' + Math.min(duelists.length, 4)}`}>
-                  {duelists.map((participant) => (
-                    <div 
-                      key={participant.id} 
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        room.current_turn_player_id === participant.player_id 
-                          ? 'border-primary bg-primary/10' 
-                          : 'border-border bg-background/50'
-                      }`}
-                    >
-                      <div className="text-center">
-                        <p className="font-semibold text-foreground mb-1 flex items-center justify-center gap-2">
-                          {participant.player.nickname}
-                          {room.current_turn_player_id === participant.player_id && (
-                            <Zap className="h-4 w-4 text-primary" />
-                          )}
-                        </p>
-                        {participant.deck && (
-                          <p className="text-xs text-muted-foreground mb-2">{participant.deck.name}</p>
-                        )}
-                        <p className={`text-4xl font-mono font-bold ${
-                          participant.life_points <= 2000 ? 'text-red-500' : 
-                          participant.life_points <= 4000 ? 'text-yellow-500' : 'text-primary'
-                        }`}>
-                          {participant.life_points}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">LP</p>
-                      </div>
-
-                      {room.status === 'active' && canControl && (
-                        <div className="flex items-center justify-center gap-2 mt-4">
+        {/* Controls and Info Grid */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Left Column - Controls */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Life Point Controls (for duelists/host) */}
+            {room.status === 'active' && canControl && (
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Life Point Controls</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {duelists.map((participant) => (
+                      <div key={participant.id} className="p-4 rounded-lg bg-background/50 border border-border">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-medium text-foreground">{participant.player.nickname}</span>
+                          <span className={`text-2xl font-mono font-bold ${
+                            participant.life_points <= 2000 ? 'text-red-500' : 
+                            participant.life_points <= 4000 ? 'text-yellow-500' : 'text-primary'
+                          }`}>
+                            {participant.life_points}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"
@@ -656,7 +853,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                             type="number"
                             value={lpChangeAmount}
                             onChange={(e) => setLpChangeAmount(parseInt(e.target.value) || 0)}
-                            className="w-20 h-8 text-center bg-input border-border"
+                            className="h-8 text-center bg-input border-border"
                           />
                           <Button
                             size="sm"
@@ -667,9 +864,6 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                      )}
-
-                      {room.status === 'active' && canControl && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -679,20 +873,12 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                           <Trophy className="h-3 w-3 mr-1" />
                           Declare Winner
                         </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {room.status === 'waiting' && duelists.length < 2 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Waiting for duelists to join...</p>
-                    <p className="text-sm mt-1">Share the room code: <span className="font-mono text-foreground">{room.room_code}</span></p>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Turn Controls */}
             {room.status === 'active' && canControl && (
@@ -776,7 +962,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
             </Card>
           </div>
 
-          {/* Sidebar */}
+          {/* Right Sidebar */}
           <div className="space-y-4">
             {/* Participants */}
             <Card className="bg-card border-border">
