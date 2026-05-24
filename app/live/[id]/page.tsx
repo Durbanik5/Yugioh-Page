@@ -41,9 +41,10 @@ function DSoDLifePointDisplay({
   totalDuelists: number
 }) {
   const lpPercentage = (participant.life_points / 8000) * 100
+  const segments = 8
+  const filledSegments = Math.ceil((participant.life_points / 8000) * segments)
   const isLowLp = participant.life_points <= 2000
   const isCriticalLp = participant.life_points <= 1000
-  const isMidLp = participant.life_points <= 4000 && participant.life_points > 2000
 
   // Calculate position for circular layout (FFA)
   const style = position ? {
@@ -53,140 +54,141 @@ function DSoDLifePointDisplay({
     transform: 'translate(-50%, -50%)',
   } : {}
 
+  const isCompact = totalDuelists > 2
+
   return (
     <div 
-      className={`flex flex-col items-center transition-all duration-500 ${
+      className={`flex flex-col transition-all duration-500 ${
         isCurrentTurn ? 'scale-105 z-20' : 'scale-100 opacity-90'
-      } ${totalDuelists > 2 ? 'max-w-[140px]' : ''}`}
+      }`}
       style={style}
     >
-      {/* Player Avatar - DSoD Style hexagonal glow */}
-      <div className={`relative mb-3 ${isCurrentTurn ? '' : ''}`}>
-        <div className={`absolute inset-0 ${isCurrentTurn ? 'animate-pulse' : ''}`}>
-          <div className={`absolute -inset-2 rounded-full blur-lg ${
-            isCurrentTurn ? 'bg-cyan-500/50' : 'bg-transparent'
-          }`} />
-        </div>
-        <div className={`relative w-16 h-16 ${totalDuelists > 3 ? 'w-12 h-12' : 'w-16 h-16'} rounded-full flex items-center justify-center text-2xl font-bold transition-all ${
-          isCurrentTurn 
-            ? 'bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/50 border-2 border-cyan-300' 
-            : 'bg-gradient-to-br from-slate-700 to-slate-800 text-slate-300 border-2 border-slate-600'
-        }`}>
-          {participant.player.nickname.charAt(0).toUpperCase()}
-        </div>
-        {isCurrentTurn && (
-          <div className="absolute -top-1 -right-1">
-            <div className="relative">
-              <Zap className="h-5 w-5 text-yellow-400 animate-bounce" />
-              <div className="absolute inset-0 blur-sm bg-yellow-400/50 rounded-full" />
+      {/* DSoD Name Plate - Blue translucent panel */}
+      <div className={`relative mb-2 ${isCompact ? 'max-w-[160px]' : ''}`}>
+        <div className={`
+          relative overflow-hidden rounded-md border backdrop-blur-sm
+          ${isCurrentTurn 
+            ? 'bg-gradient-to-r from-blue-600/90 via-blue-700/90 to-blue-800/90 border-cyan-400/60' 
+            : 'bg-gradient-to-r from-slate-700/80 via-slate-800/80 to-slate-900/80 border-slate-600/50'}
+          ${isCompact ? 'px-3 py-1.5' : 'px-4 py-2'}
+        `}>
+          {/* Holographic shine effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-200%] animate-[shimmer_3s_infinite]" />
+          
+          <div className="flex items-center gap-2">
+            {/* Player Avatar Circle */}
+            <div className={`
+              rounded-full flex items-center justify-center font-bold text-white
+              ${isCurrentTurn 
+                ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 shadow-lg shadow-cyan-500/30' 
+                : 'bg-gradient-to-br from-slate-500 to-slate-700'}
+              ${isCompact ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'}
+            `}>
+              {participant.player.nickname.charAt(0).toUpperCase()}
+            </div>
+            
+            <div className="flex flex-col">
+              <span 
+                className={`font-bold uppercase tracking-wide text-white ${isCompact ? 'text-xs' : 'text-sm'}`}
+                style={{ fontFamily: 'var(--font-orbitron)' }}
+              >
+                {participant.player.nickname}
+              </span>
+              {participant.deck && (
+                <span className={`text-cyan-300/70 truncate ${isCompact ? 'text-[9px] max-w-[80px]' : 'text-[10px] max-w-[120px]'}`}>
+                  {participant.deck.name}
+                </span>
+              )}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Player Name */}
-      <h3 className={`font-bold mb-1 text-center ${totalDuelists > 3 ? 'text-sm' : 'text-lg'} ${
-        isCurrentTurn ? 'text-cyan-400' : 'text-white'
-      }`} style={{ fontFamily: 'var(--font-orbitron)' }}>
-        {participant.player.nickname}
-      </h3>
-
-      {/* Deck Name */}
-      {participant.deck && (
-        <p className={`text-muted-foreground mb-2 text-center truncate max-w-full ${totalDuelists > 3 ? 'text-[10px]' : 'text-xs'}`}>
-          {participant.deck.name}
-        </p>
-      )}
-
-      {/* DSoD Style Life Points Display */}
-      <div className="relative">
-        {/* Outer glow ring */}
-        <div className={`absolute -inset-3 rounded-2xl blur-xl transition-all duration-500 ${
-          isCriticalLp 
-            ? 'bg-red-600/60 animate-pulse' 
-            : isLowLp 
-            ? 'bg-red-500/40' 
-            : isMidLp 
-            ? 'bg-yellow-500/30' 
-            : 'bg-cyan-500/30'
-        }`} />
-        
-        {/* Inner LP container - DSoD holographic style */}
-        <div className={`relative overflow-hidden rounded-xl border-2 backdrop-blur-md transition-all duration-300 ${
-          totalDuelists > 3 ? 'px-4 py-2' : 'px-6 py-3'
-        } ${
-          isCriticalLp 
-            ? 'border-red-500 bg-gradient-to-b from-red-950/90 to-red-900/80' 
-            : isLowLp 
-            ? 'border-red-400 bg-gradient-to-b from-red-950/80 to-slate-900/90' 
-            : isMidLp 
-            ? 'border-yellow-400 bg-gradient-to-b from-yellow-950/60 to-slate-900/90' 
-            : 'border-cyan-400 bg-gradient-to-b from-cyan-950/60 to-slate-900/90'
-        }`}>
-          {/* Holographic scan line effect */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent animate-pulse" 
-                 style={{ animationDuration: '2s' }} />
-          </div>
           
-          {/* Digital circuit pattern overlay */}
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: `linear-gradient(90deg, transparent 24%, rgba(6, 182, 212, 0.3) 25%, rgba(6, 182, 212, 0.3) 26%, transparent 27%, transparent 74%, rgba(6, 182, 212, 0.3) 75%, rgba(6, 182, 212, 0.3) 76%, transparent 77%),
-              linear-gradient(transparent 24%, rgba(6, 182, 212, 0.3) 25%, rgba(6, 182, 212, 0.3) 26%, transparent 27%, transparent 74%, rgba(6, 182, 212, 0.3) 75%, rgba(6, 182, 212, 0.3) 76%, transparent 77%)`,
-            backgroundSize: '20px 20px',
-          }} />
-
-          {/* LP Number */}
-          <div className={`relative font-mono font-black tracking-tight text-center ${
-            totalDuelists > 3 ? 'text-2xl' : 'text-4xl'
-          } ${
-            isCriticalLp 
-              ? 'text-red-400' 
-              : isLowLp 
-              ? 'text-red-400' 
-              : isMidLp 
-              ? 'text-yellow-400' 
-              : 'text-cyan-400'
-          }`} style={{ 
-            textShadow: isCriticalLp 
-              ? '0 0 20px rgba(239, 68, 68, 0.8), 0 0 40px rgba(239, 68, 68, 0.4)' 
-              : isLowLp 
-              ? '0 0 15px rgba(239, 68, 68, 0.6)' 
-              : isMidLp 
-              ? '0 0 15px rgba(234, 179, 8, 0.6)' 
-              : '0 0 15px rgba(6, 182, 212, 0.6), 0 0 30px rgba(6, 182, 212, 0.3)'
-          }}>
-            {participant.life_points.toLocaleString()}
-          </div>
-          
-          {/* LP Label */}
-          <div className={`text-center text-muted-foreground uppercase tracking-widest ${
-            totalDuelists > 3 ? 'text-[8px] mt-0.5' : 'text-[10px] mt-1'
-          }`}>
-            LP
-          </div>
+          {isCurrentTurn && (
+            <div className="absolute -top-1 -right-1">
+              <Zap className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* LP Bar - DSoD style segmented */}
-      <div className={`bg-slate-800/50 rounded-full mt-3 overflow-hidden border border-slate-700 ${
-        totalDuelists > 3 ? 'w-24 h-1.5' : 'w-36 h-2'
-      }`}>
-        <div 
-          className={`h-full rounded-full transition-all duration-500 relative overflow-hidden ${
-            isCriticalLp 
-              ? 'bg-gradient-to-r from-red-600 to-red-500' 
-              : isLowLp 
-              ? 'bg-gradient-to-r from-red-500 to-red-400' 
-              : isMidLp 
-              ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' 
-              : 'bg-gradient-to-r from-cyan-500 to-cyan-400'
-          }`}
-          style={{ width: `${lpPercentage}%` }}
-        >
-          {/* Shimmer effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" 
-               style={{ animationDuration: '2s' }} />
+      {/* DSoD Life Point Display - Main Panel */}
+      <div className={`relative ${isCompact ? 'max-w-[160px]' : ''}`}>
+        {/* Outer glow for critical LP */}
+        {isCriticalLp && (
+          <div className="absolute -inset-2 bg-red-500/30 rounded-lg blur-xl animate-pulse" />
+        )}
+        
+        <div className={`
+          relative flex items-center gap-3 rounded-md border backdrop-blur-sm overflow-hidden
+          ${isCriticalLp 
+            ? 'bg-gradient-to-r from-red-900/90 via-red-800/90 to-red-900/90 border-red-500/70' 
+            : isLowLp 
+            ? 'bg-gradient-to-r from-red-900/80 via-slate-900/90 to-slate-900/90 border-red-400/50' 
+            : 'bg-gradient-to-r from-blue-900/80 via-slate-900/90 to-slate-900/90 border-cyan-500/50'}
+          ${isCompact ? 'px-3 py-2' : 'px-4 py-3'}
+        `}>
+          {/* Holographic scan line */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/5 animate-pulse" style={{ animationDuration: '2s' }} />
+          
+          {/* LifePoint Label Panel - DSoD Style */}
+          <div className={`
+            relative flex flex-col items-start px-2 py-1 rounded border
+            ${isCriticalLp 
+              ? 'bg-gradient-to-b from-red-700/60 to-red-800/60 border-red-500/50' 
+              : 'bg-gradient-to-b from-cyan-700/40 to-blue-800/40 border-cyan-500/40'}
+            ${isCompact ? 'min-w-[50px]' : 'min-w-[60px]'}
+          `}>
+            {/* Cyan accent circle like in the movie */}
+            <div className={`
+              absolute -left-1 top-1/2 -translate-y-1/2 rounded-full border-2
+              ${isCriticalLp ? 'bg-red-500 border-red-400' : 'bg-cyan-500 border-cyan-400'}
+              ${isCompact ? 'w-2 h-2' : 'w-3 h-3'}
+            `}>
+              <div className={`absolute inset-0 rounded-full ${isCriticalLp ? 'bg-red-400' : 'bg-cyan-400'} animate-ping opacity-50`} />
+            </div>
+            
+            <span 
+              className={`text-white font-medium tracking-wider ${isCompact ? 'text-[8px]' : 'text-[10px]'}`}
+              style={{ fontFamily: 'var(--font-orbitron)' }}
+            >
+              LifePoint
+            </span>
+            
+            {/* Segmented LP Bar - DSoD Style */}
+            <div className={`flex gap-0.5 mt-1 ${isCompact ? 'h-1' : 'h-1.5'}`}>
+              {[...Array(segments)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`
+                    ${isCompact ? 'w-1.5' : 'w-2'} rounded-sm transition-all duration-300
+                    ${i < filledSegments 
+                      ? isCriticalLp 
+                        ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.6)]' 
+                        : isLowLp 
+                        ? 'bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.5)]' 
+                        : 'bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]'
+                      : 'bg-slate-700/50'}
+                  `}
+                />
+              ))}
+            </div>
+          </div>
+          
+          {/* Large LP Number - DSoD Style (white, bold, slight italic look) */}
+          <div 
+            className={`
+              font-black text-white tracking-tight relative
+              ${isCompact ? 'text-3xl' : 'text-5xl'}
+            `}
+            style={{ 
+              fontFamily: 'var(--font-orbitron)',
+              textShadow: isCriticalLp 
+                ? '0 0 20px rgba(239, 68, 68, 0.8), 2px 2px 0px rgba(0,0,0,0.5)' 
+                : '0 0 15px rgba(6, 182, 212, 0.4), 2px 2px 0px rgba(0,0,0,0.5)',
+              WebkitTextStroke: '1px rgba(0,0,0,0.3)',
+            }}
+          >
+            {participant.life_points.toLocaleString()}
+          </div>
         </div>
       </div>
     </div>
