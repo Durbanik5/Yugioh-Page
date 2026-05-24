@@ -23,7 +23,7 @@ import { toast } from 'sonner'
 import { 
   Trophy, Target, Percent, Swords, Users, 
   ChevronLeft, Trash2, Plus, Layers, Medal,
-  TrendingUp, TrendingDown, Minus
+  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -242,6 +242,118 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
   const ffaStats = useMemo(() => calculateFFAStats(matches, player.id), [matches, player.id])
   const tagTeamRecords = useMemo(() => calculateTagTeamRecords(matches, player.id, allPlayers), [matches, player.id, allPlayers])
 
+  // Calculate achievements
+  const achievements = useMemo(() => {
+    const achievementList: Array<{ id: string; name: string; description: string; icon: typeof Trophy; color: string; earned: boolean }> = []
+    
+    // Win-based achievements
+    achievementList.push({
+      id: 'first_win',
+      name: 'First Victory',
+      description: 'Win your first duel',
+      icon: Trophy,
+      color: 'text-yellow-500',
+      earned: (stats?.total_wins ?? 0) >= 1
+    })
+    achievementList.push({
+      id: 'veteran',
+      name: 'Veteran Duelist',
+      description: 'Win 10 duels',
+      icon: Medal,
+      color: 'text-amber-500',
+      earned: (stats?.total_wins ?? 0) >= 10
+    })
+    achievementList.push({
+      id: 'champion',
+      name: 'Champion',
+      description: 'Win 25 duels',
+      icon: Crown,
+      color: 'text-purple-500',
+      earned: (stats?.total_wins ?? 0) >= 25
+    })
+    achievementList.push({
+      id: 'legend',
+      name: 'Living Legend',
+      description: 'Win 50 duels',
+      icon: Star,
+      color: 'text-cyan-400',
+      earned: (stats?.total_wins ?? 0) >= 50
+    })
+    
+    // Streak achievements
+    achievementList.push({
+      id: 'hot_streak',
+      name: 'Hot Streak',
+      description: 'Win 5 duels in a row',
+      icon: Flame,
+      color: 'text-orange-500',
+      earned: (() => {
+        let streak = 0
+        let maxStreak = 0
+        const sortedMatches = [...matches].sort((a, b) => new Date(a.played_at).getTime() - new Date(b.played_at).getTime())
+        for (const match of sortedMatches) {
+          const participant = match.participants.find(p => p.player_id === player.id)
+          if (participant?.is_winner) {
+            streak++
+            maxStreak = Math.max(maxStreak, streak)
+          } else {
+            streak = 0
+          }
+        }
+        return maxStreak >= 5
+      })()
+    })
+    
+    // Format-specific achievements
+    achievementList.push({
+      id: '1v1_master',
+      name: '1v1 Master',
+      description: 'Win 10 1v1 duels',
+      icon: Swords,
+      color: 'text-blue-500',
+      earned: (stats?.wins_1v1 ?? 0) >= 10
+    })
+    achievementList.push({
+      id: 'ffa_survivor',
+      name: 'FFA Survivor',
+      description: 'Win 5 Free-For-All matches',
+      icon: Users,
+      color: 'text-green-500',
+      earned: (stats?.wins_ffa ?? 0) >= 5
+    })
+    achievementList.push({
+      id: 'team_player',
+      name: 'Team Player',
+      description: 'Win 5 Tag Team matches',
+      icon: Layers,
+      color: 'text-pink-500',
+      earned: (stats?.wins_tag ?? 0) >= 5
+    })
+    
+    // Win rate achievements
+    achievementList.push({
+      id: 'elite',
+      name: 'Elite Duelist',
+      description: 'Maintain 60%+ win rate (min 10 games)',
+      icon: Zap,
+      color: 'text-yellow-400',
+      earned: totalGames >= 10 && winRate >= 60
+    })
+    achievementList.push({
+      id: 'perfectionist',
+      name: 'Perfectionist',
+      description: 'Maintain 75%+ win rate (min 20 games)',
+      icon: Award,
+      color: 'text-emerald-400',
+      earned: totalGames >= 20 && winRate >= 75
+    })
+    
+    return achievementList
+  }, [stats, matches, player.id, totalGames, winRate])
+
+  const earnedAchievements = achievements.filter(a => a.earned)
+  const lockedAchievements = achievements.filter(a => !a.earned)
+
   const handleDelete = async () => {
     setDeleting(true)
     const supabase = createClient()
@@ -350,29 +462,69 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
                 </AlertDialog>
               </div>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-3 gap-4 mt-6">
-                <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="flex items-center justify-center gap-2 text-green-400 mb-1">
-                    <Trophy className="h-5 w-5" />
-                    <span className="text-2xl font-bold font-mono">{stats?.total_wins ?? 0}</span>
+              {/* Achievement Showcase */}
+              <div className="mt-6">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Achievement Showcase</p>
+                {earnedAchievements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No achievements earned yet. Start dueling!</p>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {earnedAchievements.slice(0, 6).map((achievement) => (
+                      <div 
+                        key={achievement.id}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-primary/20 hover:border-primary/50 transition-colors group"
+                        title={achievement.description}
+                      >
+                        <achievement.icon className={`h-5 w-5 ${achievement.color}`} />
+                        <span className="text-sm font-medium text-foreground">{achievement.name}</span>
+                      </div>
+                    ))}
+                    {earnedAchievements.length > 6 && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-border">
+                        <span className="text-sm text-muted-foreground">+{earnedAchievements.length - 6} more</span>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Wins</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="flex items-center justify-center gap-2 text-red-400 mb-1">
-                    <Target className="h-5 w-5" />
-                    <span className="text-2xl font-bold font-mono">{stats?.total_losses ?? 0}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Losses</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="flex items-center justify-center gap-2 text-primary mb-1">
-                    <Percent className="h-5 w-5" />
-                    <span className="text-2xl font-bold font-mono">{winRate.toFixed(0)}%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Win Rate</p>
-                </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Overall Stats Bar */}
+      <Card className="bg-card border-border mb-6">
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            <div className="flex items-center gap-3">
+              <Trophy className="h-6 w-6 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground font-mono">{stats?.total_wins ?? 0}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Wins</p>
+              </div>
+            </div>
+            <div className="h-10 w-px bg-border hidden sm:block" />
+            <div className="flex items-center gap-3">
+              <Target className="h-6 w-6 text-red-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground font-mono">{stats?.total_losses ?? 0}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Losses</p>
+              </div>
+            </div>
+            <div className="h-10 w-px bg-border hidden sm:block" />
+            <div className="flex items-center gap-3">
+              <Percent className="h-6 w-6 text-primary" />
+              <div>
+                <p className="text-2xl font-bold text-foreground font-mono">{winRate.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Win Rate</p>
+              </div>
+            </div>
+            <div className="h-10 w-px bg-border hidden sm:block" />
+            <div className="flex items-center gap-3">
+              <Swords className="h-6 w-6 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold text-foreground font-mono">{totalGames}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Duels</p>
               </div>
             </div>
           </div>
