@@ -417,7 +417,7 @@ function SpectatorScreen({
           <div className="relative w-full h-full">
             {duelists.map((participant, index) => {
               const angle = (index * (2 * Math.PI / duelists.length)) - (Math.PI / 2)
-              const radius = Math.min(280, Math.max(150, 350 - (duelists.length * 20)))
+              const radius = Math.min(420, Math.max(200, 450 - (duelists.length * 15)))
               
               return (
                 <DSoDLifePointDisplay
@@ -495,6 +495,8 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [selectedDeck, setSelectedDeck] = useState('')
   const [lpChangeAmount, setLpChangeAmount] = useState(1000)
   const [customEventText, setCustomEventText] = useState('')
+  const [cardActivationName, setCardActivationName] = useState('')
+  const [cardActivationPlayer, setCardActivationPlayer] = useState<string | null>(null)
   
   const chatEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -790,6 +792,23 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
     setCustomEventText('')
     toast.success('Event logged')
+  }
+
+  const handleCardActivation = async () => {
+    if (!cardActivationName.trim() || !cardActivationPlayer) return
+
+    const player = duelists.find(p => p.player_id === cardActivationPlayer)?.player
+    
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: cardActivationPlayer,
+      event_type: 'custom',
+      description: `${player?.nickname || 'Player'} activated: ${cardActivationName.trim()}`,
+    })
+
+    setCardActivationName('')
+    setCardActivationPlayer(null)
+    toast.success('Card activation logged')
   }
 
   const handleLeaveRoom = async () => {
@@ -1277,26 +1296,67 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
             {/* Custom Event */}
             {room.status === 'active' && (isDuelist || isHost) && (
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-purple-400" />
-                    Log Event
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Card activated, effect resolved..."
-                      value={customEventText}
-                      onChange={(e) => setCustomEventText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCustomEvent()}
-                      className="bg-input border-border"
-                    />
-                    <Button onClick={handleCustomEvent}>Log</Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <>
+                {/* Card Activation */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Layers className="h-5 w-5 text-amber-400" />
+                      Card Activation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <select
+                        value={cardActivationPlayer || ''}
+                        onChange={(e) => setCardActivationPlayer(e.target.value || null)}
+                        className="w-full px-3 py-2 rounded-md bg-input border border-border text-foreground text-sm"
+                      >
+                        <option value="">Select Player...</option>
+                        {duelists.map((duelist) => (
+                          <option key={duelist.player_id} value={duelist.player_id}>
+                            {duelist.player.nickname}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Card name (e.g., Blue-Eyes White Dragon)"
+                          value={cardActivationName}
+                          onChange={(e) => setCardActivationName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCardActivation()}
+                          className="bg-input border-border"
+                        />
+                        <Button onClick={handleCardActivation} disabled={!cardActivationPlayer || !cardActivationName.trim()}>
+                          Activate
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Custom Event */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-400" />
+                      Log Event
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Card activated, effect resolved..."
+                        value={customEventText}
+                        onChange={(e) => setCustomEventText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCustomEvent()}
+                        className="bg-input border-border"
+                      />
+                      <Button onClick={handleCustomEvent}>Log</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
 
             {/* Event Log */}
