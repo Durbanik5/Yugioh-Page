@@ -454,21 +454,6 @@ export default function BanlistPage() {
               Official TCG/OCG banlist and your group&apos;s custom bans
             </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
-              <SelectTrigger className="w-[180px] bg-input border-border">
-                <SelectValue placeholder="Select yourself..." />
-              </SelectTrigger>
-              <SelectContent>
-                {players.map((player) => (
-                  <SelectItem key={player.id} value={player.id}>
-                    {player.nickname}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         <Tabs defaultValue="official" className="space-y-6">
