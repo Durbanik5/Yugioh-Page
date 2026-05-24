@@ -48,7 +48,6 @@ export function AddDeckDialog({ playerId }: AddDeckDialogProps) {
           name: name.trim(),
           archetype: archetype.trim() || null,
           description: description.trim() || null,
-          is_active: false,
         })
 
       if (error) throw error

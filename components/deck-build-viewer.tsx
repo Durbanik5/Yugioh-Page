@@ -33,7 +33,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw, Search, Loader2, X } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw, Search, Loader2, X, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { DeckWithCards, DeckCard } from '@/lib/types'
 
@@ -84,6 +84,7 @@ function getDeckCategory(ygoType: string): DeckCategory {
 export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [cards, setCards] = useState<DeckCard[]>(deck.cards || [])
   const [newCard, setNewCard] = useState({ 
     name: '', 
@@ -93,6 +94,14 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
   })
   const [adding, setAdding] = useState(false)
   const [activeTab, setActiveTab] = useState<DeckCategory>('main')
+  
+  // Edit deck state
+  const [editName, setEditName] = useState(deck.name)
+  const [editArchetype, setEditArchetype] = useState(deck.archetype || '')
+  const [editDescription, setEditDescription] = useState(deck.description || '')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  
   const router = useRouter()
 
   // Search state
@@ -274,6 +283,66 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
     }
   }
 
+  const handleSaveDeck = async () => {
+    if (!editName.trim()) {
+      toast.error('Please enter a deck name')
+      return
+    }
+
+    setSaving(true)
+    const supabase = createClient()
+
+    try {
+      const { error } = await supabase
+        .from('decks')
+        .update({
+          name: editName.trim(),
+          archetype: editArchetype.trim() || null,
+          description: editDescription.trim() || null,
+        })
+        .eq('id', deck.id)
+
+      if (error) throw error
+
+      toast.success('Deck updated successfully!')
+      setEditDialogOpen(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Error updating deck:', error)
+      toast.error('Failed to update deck')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteDeck = async () => {
+    if (!confirm('Are you sure you want to delete this deck? This action cannot be undone.')) {
+      return
+    }
+
+    setDeleting(true)
+    const supabase = createClient()
+
+    try {
+      // Delete all cards first
+      await supabase.from('deck_cards').delete().eq('deck_id', deck.id)
+      
+      // Delete the deck
+      const { error } = await supabase.from('decks').delete().eq('id', deck.id)
+
+      if (error) throw error
+
+      toast.success('Deck deleted successfully!')
+      setEditDialogOpen(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Error deleting deck:', error)
+      toast.error('Failed to delete deck')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const getCardTypeColor = (type: string) => {
     switch (type) {
       case 'monster': return 'border-yellow-500/30 bg-yellow-500/10'
@@ -355,15 +424,20 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className={`bg-card border-border ${deck.is_active ? 'ring-1 ring-primary/50' : ''}`}>
+      <Card className="bg-card border-border">
         <CardHeader className="p-4 pb-2">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                 {deck.name}
-                {deck.is_active && (
-                  <Badge variant="outline" className="text-xs border-primary text-primary">Active</Badge>
-                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => setEditDialogOpen(true)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
               </CardTitle>
               {deck.archetype && (
                 <p className="text-sm text-muted-foreground">{deck.archetype}</p>
@@ -667,6 +741,80 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
           </CollapsibleContent>
         </CardContent>
       </Card>
+
+      {/* Edit Deck Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="bg-card border-primary/30">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: 'var(--font-orbitron)' }}>Edit Deck</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-deck-name">Deck Name *</Label>
+              <Input
+                id="edit-deck-name"
+                placeholder="e.g., Blue-Eyes White Dragon"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="bg-input border-border focus:border-primary"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-archetype">Archetype</Label>
+              <Input
+                id="edit-archetype"
+                placeholder="e.g., Dragon, Spellcaster, Warrior"
+                value={editArchetype}
+                onChange={(e) => setEditArchetype(e.target.value)}
+                className="bg-input border-border focus:border-primary"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                placeholder="Optional notes about this deck..."
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="bg-input border-border focus:border-primary"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditDialogOpen(false)}
+                className="flex-1 border-border hover:bg-secondary"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveDeck}
+                disabled={saving}
+                className="flex-1 bg-primary hover:bg-primary/80"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+
+            <div className="border-t border-border pt-4 mt-4">
+              <Button
+                variant="destructive"
+                onClick={handleDeleteDeck}
+                disabled={deleting}
+                className="w-full"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deleting ? 'Deleting...' : 'Delete Deck'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   )
 }

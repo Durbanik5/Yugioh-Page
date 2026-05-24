@@ -60,7 +60,7 @@ export function PlayerCard({ player, rank }: PlayerCardProps) {
               
               {player.decks.length > 0 && (
                 <p className="text-sm text-muted-foreground truncate">
-                  {player.decks.find(d => d.is_active)?.name || player.decks[0]?.name || 'No active deck'}
+                  {player.decks[0]?.name || 'No deck'}
                 </p>
               )}
               

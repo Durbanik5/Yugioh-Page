@@ -12,7 +12,6 @@ export interface Deck {
   name: string
   archetype: string | null
   description: string | null
-  is_active: boolean
   created_at: string
 }
 
