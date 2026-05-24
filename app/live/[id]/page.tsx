@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 import { 
   Radio, ArrowLeft, Users, Eye, Swords, Clock, Copy, 
   Play, Square, Plus, Minus, ChevronRight, Send, Trophy,
-  SkipForward, Zap, Shield, Sparkles, Target, Heart
+  SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase } from '@/lib/types'
@@ -334,6 +334,63 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     toast.success('Event logged')
   }
 
+  const handleLeaveRoom = async () => {
+    if (!selectedPlayer) return
+
+    const { error } = await supabase
+      .from('duel_room_participants')
+      .delete()
+      .eq('room_id', id)
+      .eq('player_id', selectedPlayer)
+
+    if (error) {
+      toast.error('Failed to leave room')
+      return
+    }
+
+    toast.success('Left the room')
+    setIsParticipant(false)
+    setIsDuelist(false)
+  }
+
+  const handleEndDuelNoWinner = async () => {
+    if (!room) return
+
+    await supabase
+      .from('duel_rooms')
+      .update({ 
+        status: 'finished', 
+        ended_at: new Date().toISOString(),
+        winner_id: null,
+      })
+      .eq('id', id)
+
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      event_type: 'game_end',
+      description: 'Duel ended (no winner declared)',
+    })
+
+    toast.success('Duel ended')
+  }
+
+  const handleDeleteRoom = async () => {
+    if (!room || !isHost) return
+
+    const { error } = await supabase
+      .from('duel_rooms')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      toast.error('Failed to delete room')
+      return
+    }
+
+    toast.success('Room deleted')
+    router.push('/live')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -481,6 +538,30 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               <Button onClick={handleStartDuel} className="bg-green-600 hover:bg-green-700">
                 <Play className="h-4 w-4 mr-2" />
                 Start Duel
+              </Button>
+            )}
+
+            {/* End Duel button for host during active duel */}
+            {room.status === 'active' && isHost && (
+              <Button onClick={handleEndDuelNoWinner} variant="destructive">
+                <Square className="h-4 w-4 mr-2" />
+                End Duel
+              </Button>
+            )}
+
+            {/* Leave Room button for participants (not host) */}
+            {isParticipant && !isHost && room.status !== 'active' && (
+              <Button onClick={handleLeaveRoom} variant="outline">
+                <LogOut className="h-4 w-4 mr-2" />
+                Leave Room
+              </Button>
+            )}
+
+            {/* Delete Room button for host when not active */}
+            {isHost && room.status !== 'active' && (
+              <Button onClick={handleDeleteRoom} variant="destructive" size="sm">
+                <X className="h-4 w-4 mr-2" />
+                Delete Room
               </Button>
             )}
           </div>
