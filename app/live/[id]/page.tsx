@@ -18,7 +18,7 @@ import {
   Radio, ArrowLeft, Users, Eye, Swords, Clock, Copy, 
   Play, Square, Plus, Minus, ChevronRight, Send, Trophy,
   SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X,
-  Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw
+  Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw, ArrowLeftRight, UserCheck
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase } from '@/lib/types'
@@ -48,12 +48,14 @@ function DSoDLifePointDisplay({
   participant, 
   isCurrentTurn,
   position,
-  totalDuelists
+  totalDuelists,
+  matchType
 }: { 
   participant: DuelRoomParticipant & { player: Player; deck: Deck | null }
   isCurrentTurn: boolean
   position?: { angle: number; radius: number }
   totalDuelists: number
+  matchType?: string
 }) {
   const lpPercentage = (participant.life_points / 8000) * 100
   const segments = 8
@@ -129,12 +131,23 @@ function DSoDLifePointDisplay({
               </div>
               
               <div className="flex flex-col min-w-0">
-                <span 
-                  className={`font-bold uppercase tracking-wide text-white truncate ${isCompact ? 'text-xs' : 'text-sm'}`}
-                  style={{ fontFamily: 'var(--font-orbitron)' }}
-                >
-                  {participant.player.nickname}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span 
+                    className={`font-bold uppercase tracking-wide text-white truncate ${isCompact ? 'text-xs' : 'text-sm'}`}
+                    style={{ fontFamily: 'var(--font-orbitron)' }}
+                  >
+                    {participant.player.nickname}
+                  </span>
+                  {matchType === 'tag_team' && (
+                    <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                      (participant.team_number || 1) === 1 
+                        ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50' 
+                        : 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
+                    }`}>
+                      T{participant.team_number || 1}
+                    </span>
+                  )}
+                </div>
                 {participant.deck && (
                   <span className={`text-cyan-300/70 truncate ${isCompact ? 'text-[9px] max-w-[80px]' : 'text-[10px] max-w-[140px]'}`}>
                     {participant.deck.name}
@@ -492,6 +505,7 @@ function SpectatorScreen({
                   isCurrentTurn={room.current_turn_player_id === participant.player_id}
                   position={{ angle, radius }}
                   totalDuelists={duelists.length}
+                  matchType={room.match_type}
                 />
               )
             })}
@@ -513,6 +527,7 @@ function SpectatorScreen({
               participant={participant}
               isCurrentTurn={room.current_turn_player_id === participant.player_id}
               totalDuelists={duelists.length}
+              matchType={room.match_type}
             />
           ))}
         </div>
@@ -574,6 +589,19 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [placingCardName, setPlacingCardName] = useState('')
   const [placingCardFaceUp, setPlacingCardFaceUp] = useState(true)
   const [placingCardPosition, setPlacingCardPosition] = useState<'attack' | 'defense'>('attack')
+  
+  // Quick add card state (for easier card placement)
+  const [quickAddCard, setQuickAddCard] = useState<{
+    participantId: string
+    playerId: string
+  } | null>(null)
+  const [quickAddCardName, setQuickAddCardName] = useState('')
+  const [quickAddZoneType, setQuickAddZoneType] = useState<'monster' | 'spelltrap'>('monster')
+  const [quickAddFaceUp, setQuickAddFaceUp] = useState(true)
+  const [quickAddPosition, setQuickAddPosition] = useState<'attack' | 'defense'>('attack')
+  
+  // Team management state (for tag team)
+  const [teamManagementOpen, setTeamManagementOpen] = useState(false)
   
   const chatEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -703,11 +731,18 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       return
     }
 
+    // For 1v1 rooms, auto-convert to spectator if already 2 duelists
+    let actualJoinAsDuelist = joinAsDuelist
+    if (room?.match_type === '1v1' && joinAsDuelist && duelists.length >= 2) {
+      actualJoinAsDuelist = false
+      toast.info('This 1v1 room already has 2 duelists. Joining as spectator.')
+    }
+
     const { error } = await supabase.from('duel_room_participants').insert({
       room_id: id,
       player_id: selectedPlayer,
       deck_id: selectedDeck || null,
-      is_spectator: !joinAsDuelist,
+      is_spectator: !actualJoinAsDuelist,
     })
 
     if (error) {
@@ -719,7 +754,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       return
     }
 
-    toast.success(joinAsDuelist ? 'Joined as duelist!' : 'Joined as spectator!')
+    toast.success(actualJoinAsDuelist ? 'Joined as duelist!' : 'Joined as spectator!')
     setJoinDialogOpen(false)
   }
 
@@ -731,13 +766,34 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       return
     }
 
+    // For 1v1, ensure only 2 duelists - convert extras to spectators
+    if (room.match_type === '1v1' && duelists.length > 2) {
+      const toConvert = duelists.slice(2)
+      for (const participant of toConvert) {
+        await supabase
+          .from('duel_room_participants')
+          .update({ is_spectator: true })
+          .eq('id', participant.id)
+      }
+      toast.info(`${toConvert.length} extra player(s) moved to spectators for 1v1`)
+    }
+
+    // Set starting hand count to 5 for all duelists
+    const actualDuelists = room.match_type === '1v1' ? duelists.slice(0, 2) : duelists
+    for (const participant of actualDuelists) {
+      await supabase
+        .from('duel_room_participants')
+        .update({ hand_count: 5 })
+        .eq('id', participant.id)
+    }
+
     await supabase
       .from('duel_rooms')
       .update({ 
         status: 'active', 
         started_at: new Date().toISOString(),
         turn_count: 1,
-        current_turn_player_id: duelists[0].player_id,
+        current_turn_player_id: actualDuelists[0].player_id,
         turn_phase: 'draw'
       })
       .eq('id', id)
@@ -745,7 +801,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     await supabase.from('duel_room_events').insert({
       room_id: id,
       event_type: 'game_start',
-      description: 'Duel started!',
+      description: 'Duel started! Each player draws 5 cards.',
     })
 
     toast.success('Duel started!')
@@ -1086,6 +1142,90 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     })
   }
 
+  // Quick add card to first available zone
+  const handleQuickAddCard = async () => {
+    if (!quickAddCard || !quickAddCardName.trim()) return
+
+    const participant = duelists.find(d => d.id === quickAddCard.participantId)
+    if (!participant) return
+
+    const zones = quickAddZoneType === 'monster' 
+      ? JSON.parse(participant.monster_zones || '[]')
+      : JSON.parse(participant.spell_trap_zones || '[]')
+    
+    while (zones.length < 5) zones.push(null)
+    
+    // Find first empty zone
+    const emptyIndex = zones.findIndex((z: MonsterCard | SpellTrapCard | null) => z === null || z === '')
+    if (emptyIndex === -1) {
+      toast.error('No empty zones available')
+      return
+    }
+    
+    if (quickAddZoneType === 'monster') {
+      zones[emptyIndex] = {
+        name: quickAddCardName.trim(),
+        faceUp: quickAddFaceUp,
+        position: quickAddPosition
+      }
+    } else {
+      zones[emptyIndex] = {
+        name: quickAddCardName.trim(),
+        faceUp: quickAddFaceUp
+      }
+    }
+    
+    const updateField = quickAddZoneType === 'monster' ? 'monster_zones' : 'spell_trap_zones'
+    await supabase
+      .from('duel_room_participants')
+      .update({ [updateField]: JSON.stringify(zones) })
+      .eq('id', quickAddCard.participantId)
+
+    // Log the placement
+    const player = duelists.find(p => p.player_id === quickAddCard.playerId)?.player
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: quickAddCard.playerId,
+      event_type: 'custom',
+      description: `${player?.nickname || 'Player'} ${quickAddFaceUp ? 'summoned' : 'set'}: ${quickAddCardName.trim()}${quickAddZoneType === 'monster' ? ` (${quickAddPosition})` : ''}`,
+    })
+
+    setQuickAddCardName('')
+    toast.success('Card added to field')
+  }
+
+  // Team management for tag team duels
+  const handleSwapTeam = async (participantId: string, playerId: string) => {
+    const participant = duelists.find(d => d.id === participantId)
+    if (!participant) return
+
+    const currentTeam = participant.team_number || 1
+    const newTeam = currentTeam === 1 ? 2 : 1
+
+    await supabase
+      .from('duel_room_participants')
+      .update({ team_number: newTeam })
+      .eq('id', participantId)
+
+    const player = participant.player
+    toast.success(`${player.nickname} moved to Team ${newTeam}`)
+    
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: playerId,
+      event_type: 'custom',
+      description: `${player.nickname} switched to Team ${newTeam}`,
+    })
+  }
+
+  // Check if current selected player can control a specific participant's board
+  const canControlBoard = (participantPlayerId: string) => {
+    // Host can control all boards
+    if (isHost) return true
+    // Players can only control their own board
+    return selectedPlayer === participantPlayerId
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -1175,17 +1315,27 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>Join as</Label>
-                      <Select value={joinAsDuelist ? 'duelist' : 'spectator'} onValueChange={(v) => setJoinAsDuelist(v === 'duelist')}>
+                      <Select 
+                        value={joinAsDuelist ? 'duelist' : 'spectator'} 
+                        onValueChange={(v) => setJoinAsDuelist(v === 'duelist')}
+                      >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="duelist">Duelist</SelectItem>
+                          <SelectItem value="duelist" disabled={room?.match_type === '1v1' && duelists.length >= 2}>
+                            Duelist {room?.match_type === '1v1' && duelists.length >= 2 && '(Full)'}
+                          </SelectItem>
                           <SelectItem value="spectator">Spectator</SelectItem>
                         </SelectContent>
                       </Select>
+                      {room?.match_type === '1v1' && duelists.length >= 2 && joinAsDuelist && (
+                        <p className="text-xs text-amber-400">
+                          This 1v1 room already has 2 duelists. You will join as a spectator.
+                        </p>
+                      )}
                     </div>
-                    {joinAsDuelist && (
+                    {joinAsDuelist && !(room?.match_type === '1v1' && duelists.length >= 2) && (
                       <div className="space-y-2">
                         <Label>Select Deck (Optional)</Label>
                         <Select value={selectedDeck} onValueChange={setSelectedDeck}>
@@ -1297,6 +1447,185 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                 Start Duel
               </Button>
             )}
+
+            {/* Team Management for Tag Team */}
+            {room.status === 'waiting' && room.match_type === 'tag_team' && isHost && (
+              <Dialog open={teamManagementOpen} onOpenChange={setTeamManagementOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <ArrowLeftRight className="h-4 w-4 mr-2" />
+                    Manage Teams
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Team Management</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Team 1 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-cyan-400 font-semibold">
+                          <Users className="h-4 w-4" />
+                          Team 1
+                        </div>
+                        <div className="space-y-2">
+                          {duelists.filter(d => (d.team_number || 1) === 1).map((participant) => (
+                            <div key={participant.id} className="flex items-center justify-between p-2 rounded bg-cyan-500/10 border border-cyan-500/30">
+                              <span className="text-sm">{participant.player.nickname}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleSwapTeam(participant.id, participant.player_id)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <ArrowLeftRight className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          {duelists.filter(d => (d.team_number || 1) === 1).length === 0 && (
+                            <p className="text-xs text-muted-foreground">No players</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Team 2 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-amber-400 font-semibold">
+                          <Users className="h-4 w-4" />
+                          Team 2
+                        </div>
+                        <div className="space-y-2">
+                          {duelists.filter(d => d.team_number === 2).map((participant) => (
+                            <div key={participant.id} className="flex items-center justify-between p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                              <span className="text-sm">{participant.player.nickname}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleSwapTeam(participant.id, participant.player_id)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <ArrowLeftRight className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          {duelists.filter(d => d.team_number === 2).length === 0 && (
+                            <p className="text-xs text-muted-foreground">No players</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Click the arrow to swap a player to the other team
+                    </p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Quick Add Card Dialog */}
+            <Dialog open={quickAddCard !== null} onOpenChange={(open) => !open && setQuickAddCard(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Quick Add Card</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Card Name</Label>
+                    <Input
+                      placeholder="e.g., Blue-Eyes White Dragon"
+                      value={quickAddCardName}
+                      onChange={(e) => setQuickAddCardName(e.target.value)}
+                      className="bg-input border-border"
+                      onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCard()}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Zone Type</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={quickAddZoneType === 'monster' ? 'default' : 'outline'}
+                        onClick={() => setQuickAddZoneType('monster')}
+                        className="flex-1"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Monster
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={quickAddZoneType === 'spelltrap' ? 'default' : 'outline'}
+                        onClick={() => setQuickAddZoneType('spelltrap')}
+                        className="flex-1"
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Spell/Trap
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Face Position</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={quickAddFaceUp ? 'default' : 'outline'}
+                        onClick={() => setQuickAddFaceUp(true)}
+                        className="flex-1"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Face-up
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={!quickAddFaceUp ? 'default' : 'outline'}
+                        onClick={() => setQuickAddFaceUp(false)}
+                        className="flex-1"
+                      >
+                        <EyeOff className="h-4 w-4 mr-2" />
+                        Face-down
+                      </Button>
+                    </div>
+                  </div>
+
+                  {quickAddZoneType === 'monster' && (
+                    <div className="space-y-2">
+                      <Label>Battle Position</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={quickAddPosition === 'attack' ? 'default' : 'outline'}
+                          onClick={() => setQuickAddPosition('attack')}
+                          className="flex-1"
+                        >
+                          <Swords className="h-4 w-4 mr-2" />
+                          Attack
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={quickAddPosition === 'defense' ? 'default' : 'outline'}
+                          onClick={() => setQuickAddPosition('defense')}
+                          className="flex-1"
+                        >
+                          <Shield className="h-4 w-4 mr-2" />
+                          Defense
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={handleQuickAddCard} 
+                    className="w-full"
+                    disabled={!quickAddCardName.trim()}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Field
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* End Duel button for host during active duel */}
             {room.status === 'active' && isHost && (
@@ -1431,15 +1760,30 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                     {duelists.map((participant) => {
                       const monsterZones = JSON.parse(participant.monster_zones || '[]')
                       const spellTrapZones = JSON.parse(participant.spell_trap_zones || '[]')
+                      const canControl = canControlBoard(participant.player_id)
+                      const isOwnBoard = selectedPlayer === participant.player_id
                       
                       return (
-                        <div key={participant.id} className="p-3 rounded-lg bg-background border border-border">
+                        <div key={participant.id} className={`p-3 rounded-lg bg-background border ${isOwnBoard ? 'border-cyan-500/50 ring-1 ring-cyan-500/20' : 'border-border'}`}>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-sm">{participant.player.nickname}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{participant.player.nickname}</span>
+                              {isOwnBoard && (
+                                <Badge variant="outline" className="text-xs bg-cyan-500/10 border-cyan-500/30 text-cyan-400">
+                                  <UserCheck className="h-3 w-3 mr-1" />
+                                  Your Board
+                                </Badge>
+                              )}
+                              {room.match_type === 'tag_team' && (
+                                <Badge variant="outline" className={`text-xs ${(participant.team_number || 1) === 1 ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
+                                  Team {participant.team_number || 1}
+                                </Badge>
+                              )}
+                            </div>
                             <span className="font-mono text-cyan-400">{participant.life_points} LP</span>
                           </div>
                           
-                          {/* LP Controls */}
+                          {/* LP Controls - Anyone can adjust LP */}
                           <div className="flex gap-2 mb-3">
                             <Button
                               size="sm"
@@ -1461,132 +1805,175 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                             </Button>
                           </div>
 
-                          {/* Hand Count Control */}
-                          <div className="flex items-center justify-between mb-3 p-2 rounded bg-amber-500/10 border border-amber-500/30">
-                            <div className="flex items-center gap-2">
-                              <Hand className="h-4 w-4 text-amber-400" />
-                              <span className="text-sm text-amber-400">Hand</span>
-                            </div>
-                            <div className="flex items-center gap-1">
+                          {/* Board Controls - Only if can control */}
+                          {canControl && (
+                            <>
+                              {/* Quick Add Card Button */}
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-amber-400 hover:bg-amber-400/20"
-                                onClick={() => handleHandCountChange(participant.id, participant.player_id, participant.hand_count || 0, -1)}
+                                variant="outline"
+                                className="w-full mb-3 text-cyan-400 border-cyan-400/50 hover:bg-cyan-400/10"
+                                onClick={() => {
+                                  setQuickAddCard({ participantId: participant.id, playerId: participant.player_id })
+                                  setQuickAddCardName('')
+                                }}
                               >
-                                <Minus className="h-3 w-3" />
+                                <Plus className="h-4 w-4 mr-2" />
+                                Quick Add Card to Field
                               </Button>
-                              <span className="font-mono text-amber-400 w-6 text-center">{participant.hand_count || 0}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 text-amber-400 hover:bg-amber-400/20"
-                                onClick={() => handleHandCountChange(participant.id, participant.player_id, participant.hand_count || 0, 1)}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
 
-                          {/* Field Zones Control */}
-                          <div className="space-y-3">
-                            {/* Monster Zones */}
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" />
-                                <span className="text-[10px] text-muted-foreground">MONSTER ZONES</span>
+                              {/* Hand Count Control */}
+                              <div className="flex items-center justify-between mb-3 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                                <div className="flex items-center gap-2">
+                                  <Hand className="h-4 w-4 text-amber-400" />
+                                  <span className="text-sm text-amber-400">Hand</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-amber-400 hover:bg-amber-400/20"
+                                    onClick={() => handleHandCountChange(participant.id, participant.player_id, participant.hand_count || 0, -1)}
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="font-mono text-amber-400 w-6 text-center">{participant.hand_count || 0}</span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-amber-400 hover:bg-amber-400/20"
+                                    onClick={() => handleHandCountChange(participant.id, participant.player_id, participant.hand_count || 0, 1)}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex gap-1">
-                                {[0, 1, 2, 3, 4].map((i) => {
-                                  const card = monsterZones[i]
-                                  const hasCard = card && card !== '' && typeof card === 'object'
-                                  return (
-                                    <div key={i} className="flex flex-col items-center gap-1">
-                                      <button
-                                        onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'monster', i, hasCard)}
-                                        className={`w-8 h-10 rounded border-2 transition-all relative group ${
-                                          hasCard 
-                                            ? card.faceUp
-                                              ? 'bg-amber-600/60 border-amber-500 shadow-[0_0_4px_rgba(217,119,6,0.5)]' 
-                                              : 'bg-slate-600/60 border-slate-500'
-                                            : 'bg-slate-800/40 border-slate-600/50 hover:border-amber-500/50'
-                                        } ${hasCard && card.position === 'defense' ? 'rotate-90' : ''}`}
-                                        title={hasCard ? `${card.name} - Click to remove` : 'Click to add card'}
-                                      >
-                                        {hasCard && (
-                                          <span className="text-[6px] text-white truncate px-0.5 leading-tight">
-                                            {card.faceUp ? card.name.substring(0, 4) : '?'}
-                                          </span>
-                                        )}
-                                      </button>
-                                      {hasCard && (
-                                        <div className="flex gap-0.5">
+
+                              {/* Field Zones Control */}
+                              <div className="space-y-3">
+                                {/* Monster Zones */}
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                                    <span className="text-[10px] text-muted-foreground">MONSTER ZONES</span>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {[0, 1, 2, 3, 4].map((i) => {
+                                      const card = monsterZones[i]
+                                      const hasCard = card && card !== '' && typeof card === 'object'
+                                      return (
+                                        <div key={i} className="flex flex-col items-center gap-1">
                                           <button
-                                            onClick={() => handleToggleCardState(participant.id, participant.player_id, 'monster', i)}
-                                            className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
-                                            title={card.faceUp ? 'Flip face-down' : 'Flip face-up'}
+                                            onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'monster', i, hasCard)}
+                                            className={`w-8 h-10 rounded border-2 transition-all relative group ${
+                                              hasCard 
+                                                ? card.faceUp
+                                                  ? 'bg-amber-600/60 border-amber-500 shadow-[0_0_4px_rgba(217,119,6,0.5)]' 
+                                                  : 'bg-slate-600/60 border-slate-500'
+                                                : 'bg-slate-800/40 border-slate-600/50 hover:border-amber-500/50'
+                                            } ${hasCard && card.position === 'defense' ? 'rotate-90' : ''}`}
+                                            title={hasCard ? `${card.name} - Click to remove` : 'Click to add card'}
                                           >
-                                            {card.faceUp ? <Eye className="h-2 w-2" /> : <EyeOff className="h-2 w-2" />}
+                                            {hasCard && (
+                                              <span className="text-[6px] text-white truncate px-0.5 leading-tight">
+                                                {card.faceUp ? card.name.substring(0, 4) : '?'}
+                                              </span>
+                                            )}
                                           </button>
-                                          <button
-                                            onClick={() => handleToggleMonsterPosition(participant.id, participant.player_id, i)}
-                                            className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
-                                            title={card.position === 'attack' ? 'Change to Defense' : 'Change to Attack'}
-                                          >
-                                            <RotateCcw className="h-2 w-2" />
-                                          </button>
+                                          {hasCard && (
+                                            <div className="flex gap-0.5">
+                                              <button
+                                                onClick={() => handleToggleCardState(participant.id, participant.player_id, 'monster', i)}
+                                                className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                                title={card.faceUp ? 'Flip face-down' : 'Flip face-up'}
+                                              >
+                                                {card.faceUp ? <Eye className="h-2 w-2" /> : <EyeOff className="h-2 w-2" />}
+                                              </button>
+                                              <button
+                                                onClick={() => handleToggleMonsterPosition(participant.id, participant.player_id, i)}
+                                                className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                                title={card.position === 'attack' ? 'Change to Defense' : 'Change to Attack'}
+                                              >
+                                                <RotateCcw className="h-2 w-2" />
+                                              </button>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                                
+                                {/* Spell/Trap Zones */}
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Shield className="h-3 w-3 text-cyan-400 flex-shrink-0" />
+                                    <span className="text-[10px] text-muted-foreground">SPELL/TRAP ZONES</span>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {[0, 1, 2, 3, 4].map((i) => {
+                                      const card = spellTrapZones[i]
+                                      const hasCard = card && card !== '' && typeof card === 'object'
+                                      return (
+                                        <div key={i} className="flex flex-col items-center gap-1">
+                                          <button
+                                            onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'spelltrap', i, hasCard)}
+                                            className={`w-8 h-10 rounded border-2 transition-all ${
+                                              hasCard 
+                                                ? card.faceUp
+                                                  ? 'bg-cyan-600/60 border-cyan-500 shadow-[0_0_4px_rgba(6,182,212,0.5)]' 
+                                                  : 'bg-purple-600/60 border-purple-500'
+                                                : 'bg-slate-800/40 border-slate-600/50 hover:border-cyan-500/50'
+                                            }`}
+                                            title={hasCard ? `${card.name} - Click to remove` : 'Click to add card'}
+                                          >
+                                            {hasCard && (
+                                              <span className="text-[6px] text-white truncate px-0.5 leading-tight">
+                                                {card.faceUp ? card.name.substring(0, 4) : '?'}
+                                              </span>
+                                            )}
+                                          </button>
+                                          {hasCard && (
+                                            <button
+                                              onClick={() => handleToggleCardState(participant.id, participant.player_id, 'spelltrap', i)}
+                                              className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                              title={card.faceUp ? 'Set face-down' : 'Activate (face-up)'}
+                                            >
+                                              {card.faceUp ? <Eye className="h-2 w-2" /> : <EyeOff className="h-2 w-2" />}
+                                            </button>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                          
+                          {/* Non-controllable: Show read-only field state */}
+                          {!canControl && (
+                            <div className="mt-3 p-2 rounded bg-slate-800/50 border border-slate-700">
+                              <p className="text-xs text-muted-foreground text-center">
+                                <Eye className="h-3 w-3 inline-block mr-1" />
+                                Viewing {participant.player.nickname}&apos;s board
+                              </p>
+                              <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Sparkles className="h-3 w-3 text-amber-400" />
+                                  M: {monsterZones.filter((z: MonsterCard | null) => z !== null && z !== '').length}/5
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Shield className="h-3 w-3 text-cyan-400" />
+                                  S/T: {spellTrapZones.filter((z: SpellTrapCard | null) => z !== null && z !== '').length}/5
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Hand className="h-3 w-3 text-amber-400" />
+                                  Hand: {participant.hand_count || 0}
+                                </span>
                               </div>
                             </div>
-                            
-                            {/* Spell/Trap Zones */}
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <Shield className="h-3 w-3 text-cyan-400 flex-shrink-0" />
-                                <span className="text-[10px] text-muted-foreground">SPELL/TRAP ZONES</span>
-                              </div>
-                              <div className="flex gap-1">
-                                {[0, 1, 2, 3, 4].map((i) => {
-                                  const card = spellTrapZones[i]
-                                  const hasCard = card && card !== '' && typeof card === 'object'
-                                  return (
-                                    <div key={i} className="flex flex-col items-center gap-1">
-                                      <button
-                                        onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'spelltrap', i, hasCard)}
-                                        className={`w-8 h-10 rounded border-2 transition-all ${
-                                          hasCard 
-                                            ? card.faceUp
-                                              ? 'bg-cyan-600/60 border-cyan-500 shadow-[0_0_4px_rgba(6,182,212,0.5)]' 
-                                              : 'bg-purple-600/60 border-purple-500'
-                                            : 'bg-slate-800/40 border-slate-600/50 hover:border-cyan-500/50'
-                                        }`}
-                                        title={hasCard ? `${card.name} - Click to remove` : 'Click to add card'}
-                                      >
-                                        {hasCard && (
-                                          <span className="text-[6px] text-white truncate px-0.5 leading-tight">
-                                            {card.faceUp ? card.name.substring(0, 4) : '?'}
-                                          </span>
-                                        )}
-                                      </button>
-                                      {hasCard && (
-                                        <button
-                                          onClick={() => handleToggleCardState(participant.id, participant.player_id, 'spelltrap', i)}
-                                          className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
-                                          title={card.faceUp ? 'Set face-down' : 'Activate (face-up)'}
-                                        >
-                                          {card.faceUp ? <Eye className="h-2 w-2" /> : <EyeOff className="h-2 w-2" />}
-                                        </button>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          </div>
+                          )}
 
                           {isHost && room.status === 'active' && (
                             <Button
