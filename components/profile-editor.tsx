@@ -185,12 +185,12 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileE
 
             <div className="space-y-2">
               <Label htmlFor="featured-deck">Featured Deck</Label>
-              <Select value={featuredDeckId} onValueChange={setFeaturedDeckId}>
+              <Select value={featuredDeckId} onValueChange={(v) => setFeaturedDeckId(v === '_none' ? '' : v)}>
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Select a deck to feature" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {decks.map((deck) => (
                     <SelectItem key={deck.id} value={deck.id}>
                       <span className="flex items-center gap-2">
@@ -228,12 +228,12 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileE
           <TabsContent value="favorites" className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="favorite-series">Favorite Yu-Gi-Oh! Series</Label>
-              <Select value={favoriteSeries} onValueChange={(v) => setFavoriteSeries(v as YugiohSeries)}>
+              <Select value={favoriteSeries} onValueChange={(v) => setFavoriteSeries(v === '_none' ? '' : v as YugiohSeries)}>
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Select your favorite series" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {Object.entries(YUGIOH_SERIES).map(([key, { label, years }]) => (
                     <SelectItem key={key} value={key}>
                       <span className="flex items-center gap-2">
@@ -248,12 +248,12 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileE
 
             <div className="space-y-2">
               <Label htmlFor="favorite-mechanic">Favorite Summoning Mechanic</Label>
-              <Select value={favoriteMechanic} onValueChange={(v) => setFavoriteMechanic(v as CardMechanic)}>
+              <Select value={favoriteMechanic} onValueChange={(v) => setFavoriteMechanic(v === '_none' ? '' : v as CardMechanic)}>
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Select your favorite mechanic" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {Object.entries(CARD_MECHANICS).map(([key, { label, color }]) => (
                     <SelectItem key={key} value={key}>
                       <span className="flex items-center gap-2">
@@ -271,12 +271,12 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileE
 
             <div className="space-y-2">
               <Label htmlFor="favorite-type">Favorite Card Type</Label>
-              <Select value={favoriteCardType} onValueChange={(v) => setFavoriteCardType(v as CardType)}>
+              <Select value={favoriteCardType} onValueChange={(v) => setFavoriteCardType(v === '_none' ? '' : v as CardType)}>
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Select your favorite type" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {Object.entries(CARD_TYPES).map(([key, { label }]) => (
                     <SelectItem key={key} value={key}>{label}</SelectItem>
                   ))}
@@ -300,12 +300,12 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileE
           <TabsContent value="rival" className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="rival">Your Rival</Label>
-              <Select value={rivalId} onValueChange={setRivalId}>
+              <Select value={rivalId} onValueChange={(v) => setRivalId(v === '_none' ? '' : v)}>
                 <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Select your rival" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {otherPlayers.map((player) => (
                     <SelectItem key={player.id} value={player.id}>
                       <span className="flex items-center gap-2">
