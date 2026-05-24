@@ -30,7 +30,7 @@ import { toast } from 'sonner'
 import { 
   Trophy, Target, Percent, Swords, Users, 
   ChevronLeft, Trash2, Plus, Layers, Medal,
-  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award, Bookmark
+  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award, Bookmark, Heart
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -38,13 +38,16 @@ import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
 import { MatchCard } from '@/components/match-card'
 import { PlayerCollection } from '@/components/player-collection'
-import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch } from '@/lib/types'
+import { ProfileEditor } from '@/components/profile-editor'
+import { PROFILE_THEMES, YUGIOH_SERIES, CARD_MECHANICS, CARD_TYPES } from '@/lib/profile-themes'
+import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch, PlayerProfile as PlayerProfileType } from '@/lib/types'
 
 interface PlayerProfileProps {
   player: PlayerWithStats
   matches: MatchWithParticipants[]
   allPlayers: Player[]
   savedMatches: SavedMatch[]
+  profile: PlayerProfileType | null
 }
 
 // Helper to get ordinal suffix
@@ -238,10 +241,41 @@ function calculateTagTeamRecords(matches: MatchWithParticipants[], playerId: str
   return Object.values(records).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses))
 }
 
-export function PlayerProfile({ player, matches, allPlayers, savedMatches }: PlayerProfileProps) {
+export function PlayerProfile({ player, matches, allPlayers, savedMatches, profile }: PlayerProfileProps) {
   const [deleting, setDeleting] = useState(false)
   const [formatFilter, setFormatFilter] = useState<DeckFormat | 'all'>('all')
   const router = useRouter()
+  
+  // Get theme config
+  const theme = profile?.theme || 'kaiba'
+  const themeConfig = PROFILE_THEMES[theme]
+  
+  // Get rival info
+  const rival = profile?.rival_id ? allPlayers.find(p => p.id === profile.rival_id) : null
+  
+  // Get featured deck
+  const featuredDeck = profile?.featured_deck_id 
+    ? player.decks.find(d => d.id === profile.featured_deck_id) 
+    : null
+  
+  // Calculate head-to-head record with rival
+  const rivalRecord = useMemo(() => {
+    if (!rival) return null
+    let wins = 0
+    let losses = 0
+    
+    matches.forEach(match => {
+      const playerPart = match.participants.find(p => p.player_id === player.id)
+      const rivalPart = match.participants.find(p => p.player_id === rival.id)
+      
+      if (playerPart && rivalPart) {
+        if (playerPart.is_winner) wins++
+        else if (rivalPart.is_winner) losses++
+      }
+    })
+    
+    return { wins, losses }
+  }, [matches, player.id, rival])
   
   const stats = player.stats
   const totalGames = (stats?.total_wins ?? 0) + (stats?.total_losses ?? 0)
@@ -410,7 +444,14 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches }: Pla
   }
   
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main 
+      className="container mx-auto px-4 py-8"
+      style={{
+        '--theme-primary': themeConfig.colors.primary,
+        '--theme-secondary': themeConfig.colors.secondary,
+        '--theme-accent': themeConfig.colors.accent,
+      } as React.CSSProperties}
+    >
       {/* Back Button */}
       <Link 
         href="/" 
@@ -420,13 +461,46 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches }: Pla
         Back to Duelists
       </Link>
 
-      {/* Profile Header */}
-      <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30 kaiba-border mb-6">
-        <CardContent className="p-6 sm:p-8">
+      {/* Profile Header with Theme */}
+      <Card 
+        className="border-2 mb-6 overflow-hidden"
+        style={{
+          background: `linear-gradient(135deg, ${themeConfig.gradientFrom}, ${themeConfig.gradientTo})`,
+          borderColor: themeConfig.colors.border,
+        }}
+      >
+        {/* Banner */}
+        {profile?.banner_url && (
+          <div className="h-32 w-full overflow-hidden relative">
+            <img 
+              src={profile.banner_url} 
+              alt="Profile banner"
+              className="w-full h-full object-cover"
+            />
+            <div 
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(to top, ${themeConfig.colors.card}, transparent)`,
+              }}
+            />
+          </div>
+        )}
+        
+        <CardContent className={`p-6 sm:p-8 ${profile?.banner_url ? '-mt-16 relative z-10' : ''}`}>
           <div className="flex flex-col sm:flex-row items-start gap-6">
-            <Avatar className="h-24 w-24 border-2 border-primary/50">
+            <Avatar 
+              className="h-24 w-24 border-4"
+              style={{ borderColor: themeConfig.colors.primary }}
+            >
               <AvatarImage src={player.avatar_url || undefined} alt={player.nickname} />
-              <AvatarFallback className="bg-primary/20 text-primary text-2xl font-bold" style={{ fontFamily: 'var(--font-orbitron)' }}>
+              <AvatarFallback 
+                className="text-2xl font-bold" 
+                style={{ 
+                  backgroundColor: themeConfig.colors.secondary,
+                  color: themeConfig.colors.text,
+                  fontFamily: 'var(--font-orbitron)' 
+                }}
+              >
                 {player.nickname.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -434,48 +508,197 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches }: Pla
             <div className="flex-1">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                  <h1 
-                    className="text-3xl font-bold text-foreground mb-1"
-                    style={{ fontFamily: 'var(--font-orbitron)' }}
-                  >
-                    {player.nickname}
-                  </h1>
-                  <p className="text-muted-foreground">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h1 
+                      className="text-3xl font-bold"
+                      style={{ fontFamily: 'var(--font-orbitron)', color: themeConfig.colors.text }}
+                    >
+                      {player.nickname}
+                    </h1>
+                    <Badge 
+                      className="text-xs"
+                      style={{ backgroundColor: themeConfig.colors.primary, color: '#fff' }}
+                    >
+                      {themeConfig.name}
+                    </Badge>
+                  </div>
+                  
+                  {/* Bio */}
+                  {profile?.bio && (
+                    <p className="text-sm mb-2" style={{ color: themeConfig.colors.muted }}>
+                      {profile.bio}
+                    </p>
+                  )}
+                  
+                  <p style={{ color: themeConfig.colors.muted }}>
                     Registered {new Date(player.created_at).toLocaleDateString()}
                   </p>
+                  
+                  {/* Favorites Row */}
+                  {(profile?.favorite_series || profile?.favorite_mechanic || profile?.favorite_card_type) && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {profile.favorite_series && (
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs"
+                          style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.accent }}
+                        >
+                          <Heart className="h-3 w-3 mr-1" />
+                          {YUGIOH_SERIES[profile.favorite_series].label}
+                        </Badge>
+                      )}
+                      {profile.favorite_mechanic && (
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs"
+                          style={{ 
+                            borderColor: CARD_MECHANICS[profile.favorite_mechanic].color, 
+                            color: CARD_MECHANICS[profile.favorite_mechanic].color 
+                          }}
+                        >
+                          <Zap className="h-3 w-3 mr-1" />
+                          {CARD_MECHANICS[profile.favorite_mechanic].label}
+                        </Badge>
+                      )}
+                      {profile.favorite_card_type && (
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs"
+                          style={{ borderColor: themeConfig.colors.border, color: themeConfig.colors.accent }}
+                        >
+                          <Star className="h-3 w-3 mr-1" />
+                          {CARD_TYPES[profile.favorite_card_type].label}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Favorite Card */}
+                  {profile?.favorite_card_name && (
+                    <p className="text-xs mt-2" style={{ color: themeConfig.colors.muted }}>
+                      Favorite Card: <span style={{ color: themeConfig.colors.accent }}>{profile.favorite_card_name}</span>
+                    </p>
+                  )}
                 </div>
                 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive/10">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-card border-primary/30">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete {player.nickname}?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently remove this duelist and all their match history. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="bg-destructive hover:bg-destructive/80"
-                      >
-                        {deleting ? 'Deleting...' : 'Delete'}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <div className="flex gap-2">
+                  <ProfileEditor 
+                    playerId={player.id}
+                    profile={profile}
+                    decks={player.decks}
+                    allPlayers={allPlayers}
+                  />
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-card border-primary/30">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {player.nickname}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove this duelist and all their match history. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleDelete}
+                          disabled={deleting}
+                          className="bg-destructive hover:bg-destructive/80"
+                        >
+                          {deleting ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
+
+              {/* Rival Section */}
+              {rival && rivalRecord && (
+                <Card 
+                  className="mt-4 border"
+                  style={{ 
+                    backgroundColor: `${themeConfig.colors.card}80`,
+                    borderColor: themeConfig.colors.border 
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Swords className="h-5 w-5" style={{ color: themeConfig.colors.primary }} />
+                        <div>
+                          <p className="text-xs uppercase tracking-wide" style={{ color: themeConfig.colors.muted }}>
+                            Rival
+                          </p>
+                          <p className="font-semibold" style={{ color: themeConfig.colors.text }}>
+                            {rival.nickname}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs uppercase tracking-wide" style={{ color: themeConfig.colors.muted }}>
+                          Head-to-Head
+                        </p>
+                        <p className="font-bold">
+                          <span className="text-green-500">{rivalRecord.wins}W</span>
+                          <span style={{ color: themeConfig.colors.muted }}> - </span>
+                          <span className="text-red-500">{rivalRecord.losses}L</span>
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Featured Deck Section */}
+              {featuredDeck && (
+                <Card 
+                  className="mt-4 border"
+                  style={{ 
+                    backgroundColor: `${themeConfig.colors.card}80`,
+                    borderColor: themeConfig.colors.border 
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Star className="h-5 w-5 text-yellow-500" />
+                      <div className="flex-1">
+                        <p className="text-xs uppercase tracking-wide" style={{ color: themeConfig.colors.muted }}>
+                          Featured Deck
+                        </p>
+                        <p className="font-semibold" style={{ color: themeConfig.colors.text }}>
+                          {featuredDeck.name}
+                        </p>
+                        {featuredDeck.archetype && (
+                          <p className="text-xs" style={{ color: themeConfig.colors.muted }}>
+                            {featuredDeck.archetype}
+                          </p>
+                        )}
+                      </div>
+                      {featuredDeck.mvp_card_name && (
+                        <div className="text-right">
+                          <p className="text-xs uppercase tracking-wide" style={{ color: themeConfig.colors.muted }}>
+                            MVP
+                          </p>
+                          <p className="text-sm" style={{ color: themeConfig.colors.accent }}>
+                            {featuredDeck.mvp_card_name}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Achievement Showcase */}
               <div className="mt-6">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Achievement Showcase</p>
+                <p className="text-xs uppercase tracking-wide mb-3" style={{ color: themeConfig.colors.muted }}>
+                  Achievement Showcase
+                </p>
                 {earnedAchievements.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No achievements earned yet. Start dueling!</p>
                 ) : (

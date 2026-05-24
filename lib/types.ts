@@ -216,3 +216,30 @@ export interface SavedMatch {
 export interface SavedMatchWithDetails extends SavedMatch {
   match: MatchWithParticipants
 }
+
+// Profile Customization Types
+export type ProfileTheme = 'kaiba' | 'yugi' | 'joey' | 'marik' | 'pegasus' | 'jaden' | 'yusei' | 'yuma' | 'yuya' | 'yusaku'
+export type YugiohSeries = 'duel_monsters' | 'gx' | 'five_ds' | 'zexal' | 'arc_v' | 'vrains' | 'sevens' | 'go_rush'
+export type CardMechanic = 'fusion' | 'ritual' | 'synchro' | 'xyz' | 'pendulum' | 'link' | 'normal' | 'effect'
+export type CardType = 'dragon' | 'spellcaster' | 'warrior' | 'fiend' | 'fairy' | 'zombie' | 'machine' | 'aqua' | 'pyro' | 'rock' | 'winged_beast' | 'plant' | 'insect' | 'thunder' | 'dinosaur' | 'reptile' | 'fish' | 'sea_serpent' | 'beast' | 'beast_warrior' | 'psychic' | 'divine_beast' | 'wyrm' | 'cyberse'
+
+export interface PlayerProfile {
+  id: string
+  player_id: string
+  bio: string | null
+  featured_deck_id: string | null
+  favorite_series: YugiohSeries | null
+  favorite_mechanic: CardMechanic | null
+  favorite_card_type: CardType | null
+  favorite_card_name: string | null
+  rival_id: string | null
+  theme: ProfileTheme
+  banner_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PlayerProfileWithRelations extends PlayerProfile {
+  featured_deck?: DeckWithCards | null
+  rival?: Player | null
+}

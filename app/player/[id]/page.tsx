@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/header'
 import { PlayerProfile } from './player-profile'
-import type { PlayerWithStats, MatchWithParticipants, Player, SavedMatch } from '@/lib/types'
+import type { PlayerWithStats, MatchWithParticipants, Player, SavedMatch, PlayerProfile as PlayerProfileType } from '@/lib/types'
 
 export const revalidate = 0
 
@@ -112,6 +112,23 @@ async function getSavedMatches(playerId: string): Promise<SavedMatch[]> {
   return data || []
 }
 
+async function getPlayerProfile(playerId: string): Promise<PlayerProfileType | null> {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('player_profiles')
+    .select('*')
+    .eq('player_id', playerId)
+    .single()
+
+  if (error) {
+    // No profile yet is okay
+    return null
+  }
+
+  return data
+}
+
 export default async function PlayerPage({ params }: PlayerPageProps) {
   const { id } = await params
   const player = await getPlayer(id)
@@ -120,10 +137,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     notFound()
   }
 
-  const [matches, allPlayers, savedMatches] = await Promise.all([
+  const [matches, allPlayers, savedMatches, playerProfile] = await Promise.all([
     getPlayerMatches(id),
     getAllPlayers(),
-    getSavedMatches(id)
+    getSavedMatches(id),
+    getPlayerProfile(id)
   ])
 
   return (
@@ -134,6 +152,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         matches={matches} 
         allPlayers={allPlayers}
         savedMatches={savedMatches}
+        profile={playerProfile}
       />
     </div>
   )
