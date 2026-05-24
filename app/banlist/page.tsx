@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Header } from '@/components/header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -94,32 +94,38 @@ export default function BanlistPage() {
   }, [fetchData])
 
   // Search YGOPRODeck API
-  useEffect(() => {
-    if (searchQuery.length < 3) {
+  const handleSearch = useCallback(async (query: string) => {
+    if (query.length < 3) {
       setSearchResults([])
       return
     }
 
-    const timer = setTimeout(async () => {
-      setSearching(true)
-      try {
-        const res = await fetch(
-          `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(searchQuery)}&num=10&offset=0`
-        )
-        if (res.ok) {
-          const data = await res.json()
-          setSearchResults(data.data || [])
-        } else {
-          setSearchResults([])
-        }
-      } catch {
+    setSearching(true)
+    try {
+      const res = await fetch(
+        `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=10&offset=0`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setSearchResults(data.data || [])
+      } else {
         setSearchResults([])
       }
-      setSearching(false)
+    } catch {
+      setSearchResults([])
+    }
+    setSearching(false)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.length >= 3 && !selectedCard) {
+        handleSearch(searchQuery)
+      }
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, selectedCard, handleSearch])
 
   const handleAddToBanlist = async () => {
     if (!selectedCard) {
@@ -306,85 +312,16 @@ export default function BanlistPage() {
     setProposalType('ban')
   }
 
-  const CardSearchInput = () => (
-    <div className="space-y-2">
-      <Label>Search Card</Label>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search Yu-Gi-Oh card..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value)
-            setSelectedCard(null)
-          }}
-          className="pl-9 bg-input border-border"
-        />
-        {searching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-        )}
-      </div>
-
-      {searchResults.length > 0 && !selectedCard && (
-        <div className="border border-border rounded-md bg-card max-h-60 overflow-y-auto">
-          {searchResults.map((card) => (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => {
-                setSelectedCard(card)
-                setSearchQuery(card.name)
-                setSearchResults([])
-              }}
-              className="w-full flex items-center gap-3 p-2 hover:bg-muted/50 transition-colors text-left"
-            >
-              {card.card_images[0] && (
-                <Image
-                  src={card.card_images[0].image_url_small}
-                  alt={card.name}
-                  width={32}
-                  height={47}
-                  className="rounded"
-                />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{card.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{card.type}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {selectedCard && (
-        <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md border border-border">
-          {selectedCard.card_images[0] && (
-            <Image
-              src={selectedCard.card_images[0].image_url_small}
-              alt={selectedCard.name}
-              width={48}
-              height={70}
-              className="rounded"
-            />
-          )}
-          <div className="flex-1">
-            <p className="font-medium">{selectedCard.name}</p>
-            <p className="text-sm text-muted-foreground">{selectedCard.type}</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedCard(null)
-              setSearchQuery('')
-            }}
-          >
-            <XCircle className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-    </div>
-  )
+  const handleDialogOpenChange = (open: boolean, type: 'add' | 'propose') => {
+    if (type === 'add') {
+      setAddDialogOpen(open)
+    } else {
+      setProposeDialogOpen(open)
+    }
+    if (!open) {
+      resetForm()
+    }
+  }
 
   if (loading) {
     return (
@@ -411,7 +348,7 @@ export default function BanlistPage() {
               style={{ fontFamily: 'var(--font-orbitron)' }}
             >
               <Ban className="h-8 w-8 text-destructive" />
-              BANLIST / HOUSE RULES
+              BANLIST
             </h1>
             <p className="text-muted-foreground mt-1">
               Manage banned cards and vote on proposals
@@ -449,7 +386,7 @@ export default function BanlistPage() {
           {/* Banned Cards Tab */}
           <TabsContent value="banlist" className="space-y-4">
             <div className="flex justify-end">
-              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <Dialog open={addDialogOpen} onOpenChange={(open) => handleDialogOpenChange(open, 'add')}>
                 <DialogTrigger asChild>
                   <Button className="bg-destructive hover:bg-destructive/80">
                     <Plus className="h-4 w-4 mr-2" />
@@ -460,11 +397,89 @@ export default function BanlistPage() {
                   <DialogHeader>
                     <DialogTitle>Add Card to Banlist</DialogTitle>
                     <DialogDescription>
-                      Search for a card to add to your house banlist.
+                      Search for a card to add to your banlist.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
-                    <CardSearchInput />
+                    {/* Card Search - Inlined */}
+                    <div className="space-y-2">
+                      <Label>Search Card</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search Yu-Gi-Oh card..."
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value)
+                            if (selectedCard) setSelectedCard(null)
+                          }}
+                          className="pl-9 bg-input border-border"
+                        />
+                        {searching && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+
+                      {searchResults.length > 0 && !selectedCard && (
+                        <div className="border border-border rounded-md bg-card max-h-60 overflow-y-auto">
+                          {searchResults.map((card) => (
+                            <button
+                              key={card.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCard(card)
+                                setSearchQuery(card.name)
+                                setSearchResults([])
+                              }}
+                              className="w-full flex items-center gap-3 p-2 hover:bg-muted/50 transition-colors text-left"
+                            >
+                              {card.card_images[0] && (
+                                <Image
+                                  src={card.card_images[0].image_url_small}
+                                  alt={card.name}
+                                  width={32}
+                                  height={47}
+                                  className="rounded"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{card.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{card.type}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {selectedCard && (
+                        <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md border border-border">
+                          {selectedCard.card_images[0] && (
+                            <Image
+                              src={selectedCard.card_images[0].image_url_small}
+                              alt={selectedCard.name}
+                              width={48}
+                              height={70}
+                              className="rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <p className="font-medium">{selectedCard.name}</p>
+                            <p className="text-sm text-muted-foreground">{selectedCard.type}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCard(null)
+                              setSearchQuery('')
+                            }}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="space-y-2">
                       <Label>Reason (Optional)</Label>
                       <Textarea
@@ -497,7 +512,7 @@ export default function BanlistPage() {
                   <Ban className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No cards are currently banned.</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Add cards to create your house banlist.
+                    Add cards to create your banlist.
                   </p>
                 </CardContent>
               </Card>
@@ -553,7 +568,7 @@ export default function BanlistPage() {
           {/* Proposals Tab */}
           <TabsContent value="proposals" className="space-y-4">
             <div className="flex justify-end">
-              <Dialog open={proposeDialogOpen} onOpenChange={setProposeDialogOpen}>
+              <Dialog open={proposeDialogOpen} onOpenChange={(open) => handleDialogOpenChange(open, 'propose')}>
                 <DialogTrigger asChild>
                   <Button className="bg-primary hover:bg-primary/80">
                     <Plus className="h-4 w-4 mr-2" />
@@ -583,7 +598,86 @@ export default function BanlistPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <CardSearchInput />
+
+                    {/* Card Search - Inlined for Proposals */}
+                    <div className="space-y-2">
+                      <Label>Search Card</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search Yu-Gi-Oh card..."
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value)
+                            if (selectedCard) setSelectedCard(null)
+                          }}
+                          className="pl-9 bg-input border-border"
+                        />
+                        {searching && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+
+                      {searchResults.length > 0 && !selectedCard && (
+                        <div className="border border-border rounded-md bg-card max-h-60 overflow-y-auto">
+                          {searchResults.map((card) => (
+                            <button
+                              key={card.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCard(card)
+                                setSearchQuery(card.name)
+                                setSearchResults([])
+                              }}
+                              className="w-full flex items-center gap-3 p-2 hover:bg-muted/50 transition-colors text-left"
+                            >
+                              {card.card_images[0] && (
+                                <Image
+                                  src={card.card_images[0].image_url_small}
+                                  alt={card.name}
+                                  width={32}
+                                  height={47}
+                                  className="rounded"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{card.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{card.type}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {selectedCard && (
+                        <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md border border-border">
+                          {selectedCard.card_images[0] && (
+                            <Image
+                              src={selectedCard.card_images[0].image_url_small}
+                              alt={selectedCard.name}
+                              width={48}
+                              height={70}
+                              className="rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <p className="font-medium">{selectedCard.name}</p>
+                            <p className="text-sm text-muted-foreground">{selectedCard.type}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCard(null)
+                              setSearchQuery('')
+                            }}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="space-y-2">
                       <Label>Reason</Label>
                       <Textarea
