@@ -18,10 +18,25 @@ import {
   Radio, ArrowLeft, Users, Eye, Swords, Clock, Copy, 
   Play, Square, Plus, Minus, ChevronRight, Send, Trophy,
   SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X,
-  Maximize2, Monitor, Hand, Layers
+  Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase } from '@/lib/types'
+
+// Field Zone Card Types
+interface MonsterCard {
+  name: string
+  faceUp: boolean
+  position: 'attack' | 'defense'
+}
+
+interface SpellTrapCard {
+  name: string
+  faceUp: boolean
+}
+
+type MonsterZone = MonsterCard | null
+type SpellTrapZone = SpellTrapCard | null
 
 interface RoomData extends DuelRoom {
   participants: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
@@ -46,9 +61,29 @@ function DSoDLifePointDisplay({
   const isLowLp = participant.life_points <= 2000
   const isCriticalLp = participant.life_points <= 1000
 
-  // Parse field zone data
-  const monsterZones = JSON.parse(participant.monster_zones || '[]') as string[]
-  const spellTrapZones = JSON.parse(participant.spell_trap_zones || '[]') as string[]
+  // Parse field zone data - new format with card details
+  const monsterZones: MonsterZone[] = (() => {
+    try {
+      const parsed = JSON.parse(participant.monster_zones || '[]')
+      // Handle old format (string array) and new format (object array)
+      return parsed.map((z: string | MonsterCard | null) => {
+        if (!z || z === '') return null
+        if (typeof z === 'string') return { name: z, faceUp: true, position: 'attack' as const }
+        return z
+      })
+    } catch { return [null, null, null, null, null] }
+  })()
+  
+  const spellTrapZones: SpellTrapZone[] = (() => {
+    try {
+      const parsed = JSON.parse(participant.spell_trap_zones || '[]')
+      return parsed.map((z: string | SpellTrapCard | null) => {
+        if (!z || z === '') return null
+        if (typeof z === 'string') return { name: z, faceUp: true }
+        return z
+      })
+    } catch { return [null, null, null, null, null] }
+  })()
   const handCount = participant.hand_count || 0
 
   // Calculate position for circular layout (FFA)
@@ -212,21 +247,37 @@ function DSoDLifePointDisplay({
           {/* Monster Zones - 5 slots */}
           <div className="flex justify-center gap-1 mb-1">
             {[0, 1, 2, 3, 4].map((index) => {
-              const hasCard = monsterZones[index] && monsterZones[index] !== ''
+              const card = monsterZones[index]
+              const hasCard = card !== null && card !== undefined
               return (
                 <div
                   key={`monster-${index}`}
                   className={`
-                    ${isCompact ? 'w-5 h-6' : 'w-8 h-10'} rounded border-2 transition-all
+                    ${isCompact ? 'w-5 h-6' : 'w-8 h-10'} rounded border-2 transition-all relative group
                     ${hasCard 
-                      ? 'bg-amber-900/60 border-amber-500/60 shadow-[0_0_6px_rgba(217,119,6,0.4)]' 
+                      ? card.faceUp
+                        ? 'bg-amber-900/60 border-amber-500/60 shadow-[0_0_6px_rgba(217,119,6,0.4)]' 
+                        : 'bg-slate-700/80 border-slate-500/60 shadow-[0_0_4px_rgba(100,116,139,0.4)]'
                       : 'bg-slate-800/40 border-slate-600/30'}
+                    ${hasCard && card.position === 'defense' ? 'rotate-90' : ''}
                   `}
-                  title={hasCard ? monsterZones[index] : `Monster Zone ${index + 1}`}
+                  title={hasCard ? `${card.name} (${card.faceUp ? 'Face-up' : 'Face-down'} ${card.position})` : `Monster Zone ${index + 1}`}
                 >
                   {hasCard && (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Sparkles className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-amber-400`} />
+                      {card.faceUp ? (
+                        <Sparkles className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-amber-400`} />
+                      ) : (
+                        <EyeOff className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-slate-400`} />
+                      )}
+                    </div>
+                  )}
+                  {/* Tooltip on hover */}
+                  {hasCard && !isCompact && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-[8px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none">
+                      {card.name}
+                      <br />
+                      <span className="text-slate-400">{card.faceUp ? 'Face-up' : 'Face-down'} {card.position}</span>
                     </div>
                   )}
                 </div>
@@ -237,21 +288,36 @@ function DSoDLifePointDisplay({
           {/* Spell/Trap Zones - 5 slots */}
           <div className="flex justify-center gap-1">
             {[0, 1, 2, 3, 4].map((index) => {
-              const hasCard = spellTrapZones[index] && spellTrapZones[index] !== ''
+              const card = spellTrapZones[index]
+              const hasCard = card !== null && card !== undefined
               return (
                 <div
                   key={`spelltrap-${index}`}
                   className={`
-                    ${isCompact ? 'w-5 h-6' : 'w-8 h-10'} rounded border-2 transition-all
+                    ${isCompact ? 'w-5 h-6' : 'w-8 h-10'} rounded border-2 transition-all relative group
                     ${hasCard 
-                      ? 'bg-cyan-900/60 border-cyan-500/60 shadow-[0_0_6px_rgba(6,182,212,0.4)]' 
+                      ? card.faceUp
+                        ? 'bg-cyan-900/60 border-cyan-500/60 shadow-[0_0_6px_rgba(6,182,212,0.4)]' 
+                        : 'bg-purple-900/60 border-purple-500/60 shadow-[0_0_4px_rgba(168,85,247,0.4)]'
                       : 'bg-slate-800/40 border-slate-600/30'}
                   `}
-                  title={hasCard ? spellTrapZones[index] : `Spell/Trap Zone ${index + 1}`}
+                  title={hasCard ? `${card.name} (${card.faceUp ? 'Face-up' : 'Set'})` : `Spell/Trap Zone ${index + 1}`}
                 >
                   {hasCard && (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Shield className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-cyan-400`} />
+                      {card.faceUp ? (
+                        <Shield className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-cyan-400`} />
+                      ) : (
+                        <EyeOff className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-purple-400`} />
+                      )}
+                    </div>
+                  )}
+                  {/* Tooltip on hover */}
+                  {hasCard && !isCompact && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-[8px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none">
+                      {card.name}
+                      <br />
+                      <span className="text-slate-400">{card.faceUp ? 'Face-up' : 'Set'}</span>
                     </div>
                   )}
                 </div>
@@ -261,8 +327,8 @@ function DSoDLifePointDisplay({
           
           {/* Zone labels */}
           <div className="flex justify-between mt-1 px-1">
-            <span className={`text-amber-400/70 ${isCompact ? 'text-[6px]' : 'text-[8px]'}`}>M: {monsterZones.filter(z => z && z !== '').length}/5</span>
-            <span className={`text-cyan-400/70 ${isCompact ? 'text-[6px]' : 'text-[8px]'}`}>S/T: {spellTrapZones.filter(z => z && z !== '').length}/5</span>
+            <span className={`text-amber-400/70 ${isCompact ? 'text-[6px]' : 'text-[8px]'}`}>M: {monsterZones.filter(z => z !== null).length}/5</span>
+            <span className={`text-cyan-400/70 ${isCompact ? 'text-[6px]' : 'text-[8px]'}`}>S/T: {spellTrapZones.filter(z => z !== null).length}/5</span>
           </div>
         </div>
       </div>
@@ -497,6 +563,17 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [customEventText, setCustomEventText] = useState('')
   const [cardActivationName, setCardActivationName] = useState('')
   const [cardActivationPlayer, setCardActivationPlayer] = useState<string | null>(null)
+  
+  // Field zone card placement state
+  const [placingCard, setPlacingCard] = useState<{
+    participantId: string
+    playerId: string
+    zoneType: 'monster' | 'spelltrap'
+    zoneIndex: number
+  } | null>(null)
+  const [placingCardName, setPlacingCardName] = useState('')
+  const [placingCardFaceUp, setPlacingCardFaceUp] = useState(true)
+  const [placingCardPosition, setPlacingCardPosition] = useState<'attack' | 'defense'>('attack')
   
   const chatEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -886,6 +963,77 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   }
 
   const handleFieldZoneChange = async (participantId: string, playerId: string, zoneType: 'monster' | 'spelltrap', zoneIndex: number, hasCard: boolean) => {
+    if (hasCard) {
+      // Remove card from zone
+      const participant = duelists.find(d => d.id === participantId)
+      if (!participant) return
+
+      const zones = zoneType === 'monster' 
+        ? JSON.parse(participant.monster_zones || '[]')
+        : JSON.parse(participant.spell_trap_zones || '[]')
+      
+      while (zones.length < 5) zones.push(null)
+      zones[zoneIndex] = null
+      
+      const updateField = zoneType === 'monster' ? 'monster_zones' : 'spell_trap_zones'
+      await supabase
+        .from('duel_room_participants')
+        .update({ [updateField]: JSON.stringify(zones) })
+        .eq('id', participantId)
+    } else {
+      // Open dialog to place card
+      setPlacingCard({ participantId, playerId, zoneType, zoneIndex })
+      setPlacingCardName('')
+      setPlacingCardFaceUp(true)
+      setPlacingCardPosition('attack')
+    }
+  }
+
+  const handlePlaceCard = async () => {
+    if (!placingCard || !placingCardName.trim()) return
+
+    const participant = duelists.find(d => d.id === placingCard.participantId)
+    if (!participant) return
+
+    const zones = placingCard.zoneType === 'monster' 
+      ? JSON.parse(participant.monster_zones || '[]')
+      : JSON.parse(participant.spell_trap_zones || '[]')
+    
+    while (zones.length < 5) zones.push(null)
+    
+    if (placingCard.zoneType === 'monster') {
+      zones[placingCard.zoneIndex] = {
+        name: placingCardName.trim(),
+        faceUp: placingCardFaceUp,
+        position: placingCardPosition
+      }
+    } else {
+      zones[placingCard.zoneIndex] = {
+        name: placingCardName.trim(),
+        faceUp: placingCardFaceUp
+      }
+    }
+    
+    const updateField = placingCard.zoneType === 'monster' ? 'monster_zones' : 'spell_trap_zones'
+    await supabase
+      .from('duel_room_participants')
+      .update({ [updateField]: JSON.stringify(zones) })
+      .eq('id', placingCard.participantId)
+
+    // Log the placement
+    const player = duelists.find(p => p.player_id === placingCard.playerId)?.player
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: placingCard.playerId,
+      event_type: 'custom',
+      description: `${player?.nickname || 'Player'} ${placingCardFaceUp ? 'summoned' : 'set'}: ${placingCardName.trim()}${placingCard.zoneType === 'monster' ? ` (${placingCardPosition})` : ''}`,
+    })
+
+    setPlacingCard(null)
+    toast.success('Card placed')
+  }
+
+  const handleToggleCardState = async (participantId: string, playerId: string, zoneType: 'monster' | 'spelltrap', zoneIndex: number) => {
     const participant = duelists.find(d => d.id === participantId)
     if (!participant) return
 
@@ -893,17 +1041,49 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       ? JSON.parse(participant.monster_zones || '[]')
       : JSON.parse(participant.spell_trap_zones || '[]')
     
-    // Ensure array has 5 slots
-    while (zones.length < 5) zones.push('')
-    
-    // Toggle the zone
-    zones[zoneIndex] = hasCard ? '' : 'card'
+    const card = zones[zoneIndex]
+    if (!card) return
+
+    // Toggle face up/down
+    card.faceUp = !card.faceUp
     
     const updateField = zoneType === 'monster' ? 'monster_zones' : 'spell_trap_zones'
     await supabase
       .from('duel_room_participants')
       .update({ [updateField]: JSON.stringify(zones) })
       .eq('id', participantId)
+
+    const player = duelists.find(p => p.player_id === playerId)?.player
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: playerId,
+      event_type: 'custom',
+      description: `${player?.nickname || 'Player'} flipped ${card.name} ${card.faceUp ? 'face-up' : 'face-down'}`,
+    })
+  }
+
+  const handleToggleMonsterPosition = async (participantId: string, playerId: string, zoneIndex: number) => {
+    const participant = duelists.find(d => d.id === participantId)
+    if (!participant) return
+
+    const zones = JSON.parse(participant.monster_zones || '[]')
+    const card = zones[zoneIndex]
+    if (!card) return
+
+    card.position = card.position === 'attack' ? 'defense' : 'attack'
+    
+    await supabase
+      .from('duel_room_participants')
+      .update({ monster_zones: JSON.stringify(zones) })
+      .eq('id', participantId)
+
+    const player = duelists.find(p => p.player_id === playerId)?.player
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: playerId,
+      event_type: 'custom',
+      description: `${player?.nickname || 'Player'} changed ${card.name} to ${card.position} position`,
+    })
   }
 
   if (loading) {
@@ -1029,6 +1209,86 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                 </DialogContent>
               </Dialog>
             )}
+
+            {/* Card Placement Dialog */}
+            <Dialog open={placingCard !== null} onOpenChange={(open) => !open && setPlacingCard(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {placingCard?.zoneType === 'monster' ? 'Place Monster' : 'Place Spell/Trap'}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Card Name</Label>
+                    <Input
+                      placeholder="e.g., Blue-Eyes White Dragon"
+                      value={placingCardName}
+                      onChange={(e) => setPlacingCardName(e.target.value)}
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Face Position</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={placingCardFaceUp ? 'default' : 'outline'}
+                        onClick={() => setPlacingCardFaceUp(true)}
+                        className="flex-1"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Face-up
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={!placingCardFaceUp ? 'default' : 'outline'}
+                        onClick={() => setPlacingCardFaceUp(false)}
+                        className="flex-1"
+                      >
+                        <EyeOff className="h-4 w-4 mr-2" />
+                        Face-down
+                      </Button>
+                    </div>
+                  </div>
+
+                  {placingCard?.zoneType === 'monster' && (
+                    <div className="space-y-2">
+                      <Label>Battle Position</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={placingCardPosition === 'attack' ? 'default' : 'outline'}
+                          onClick={() => setPlacingCardPosition('attack')}
+                          className="flex-1"
+                        >
+                          <Swords className="h-4 w-4 mr-2" />
+                          Attack
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={placingCardPosition === 'defense' ? 'default' : 'outline'}
+                          onClick={() => setPlacingCardPosition('defense')}
+                          className="flex-1"
+                        >
+                          <Shield className="h-4 w-4 mr-2" />
+                          Defense
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={handlePlaceCard} 
+                    className="w-full"
+                    disabled={!placingCardName.trim()}
+                  >
+                    Place Card
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Start Duel */}
             {room.status === 'waiting' && isHost && duelists.length >= 2 && (
@@ -1229,46 +1489,99 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                           </div>
 
                           {/* Field Zones Control */}
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {/* Monster Zones */}
-                            <div className="flex items-center gap-2">
-                              <Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" />
-                              <span className="text-[10px] text-muted-foreground w-8">MON</span>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                                <span className="text-[10px] text-muted-foreground">MONSTER ZONES</span>
+                              </div>
                               <div className="flex gap-1">
                                 {[0, 1, 2, 3, 4].map((i) => {
-                                  const hasCard = monsterZones[i] && monsterZones[i] !== ''
+                                  const card = monsterZones[i]
+                                  const hasCard = card && card !== '' && typeof card === 'object'
                                   return (
-                                    <button
-                                      key={i}
-                                      onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'monster', i, hasCard)}
-                                      className={`w-6 h-7 rounded border-2 transition-all ${
-                                        hasCard 
-                                          ? 'bg-amber-600/60 border-amber-500 shadow-[0_0_4px_rgba(217,119,6,0.5)]' 
-                                          : 'bg-slate-800/40 border-slate-600/50 hover:border-amber-500/50'
-                                      }`}
-                                    />
+                                    <div key={i} className="flex flex-col items-center gap-1">
+                                      <button
+                                        onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'monster', i, hasCard)}
+                                        className={`w-8 h-10 rounded border-2 transition-all relative group ${
+                                          hasCard 
+                                            ? card.faceUp
+                                              ? 'bg-amber-600/60 border-amber-500 shadow-[0_0_4px_rgba(217,119,6,0.5)]' 
+                                              : 'bg-slate-600/60 border-slate-500'
+                                            : 'bg-slate-800/40 border-slate-600/50 hover:border-amber-500/50'
+                                        } ${hasCard && card.position === 'defense' ? 'rotate-90' : ''}`}
+                                        title={hasCard ? `${card.name} - Click to remove` : 'Click to add card'}
+                                      >
+                                        {hasCard && (
+                                          <span className="text-[6px] text-white truncate px-0.5 leading-tight">
+                                            {card.faceUp ? card.name.substring(0, 4) : '?'}
+                                          </span>
+                                        )}
+                                      </button>
+                                      {hasCard && (
+                                        <div className="flex gap-0.5">
+                                          <button
+                                            onClick={() => handleToggleCardState(participant.id, participant.player_id, 'monster', i)}
+                                            className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                            title={card.faceUp ? 'Flip face-down' : 'Flip face-up'}
+                                          >
+                                            {card.faceUp ? <Eye className="h-2 w-2" /> : <EyeOff className="h-2 w-2" />}
+                                          </button>
+                                          <button
+                                            onClick={() => handleToggleMonsterPosition(participant.id, participant.player_id, i)}
+                                            className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                            title={card.position === 'attack' ? 'Change to Defense' : 'Change to Attack'}
+                                          >
+                                            <RotateCcw className="h-2 w-2" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   )
                                 })}
                               </div>
                             </div>
                             
                             {/* Spell/Trap Zones */}
-                            <div className="flex items-center gap-2">
-                              <Shield className="h-3 w-3 text-cyan-400 flex-shrink-0" />
-                              <span className="text-[10px] text-muted-foreground w-8">S/T</span>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Shield className="h-3 w-3 text-cyan-400 flex-shrink-0" />
+                                <span className="text-[10px] text-muted-foreground">SPELL/TRAP ZONES</span>
+                              </div>
                               <div className="flex gap-1">
                                 {[0, 1, 2, 3, 4].map((i) => {
-                                  const hasCard = spellTrapZones[i] && spellTrapZones[i] !== ''
+                                  const card = spellTrapZones[i]
+                                  const hasCard = card && card !== '' && typeof card === 'object'
                                   return (
-                                    <button
-                                      key={i}
-                                      onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'spelltrap', i, hasCard)}
-                                      className={`w-6 h-7 rounded border-2 transition-all ${
-                                        hasCard 
-                                          ? 'bg-cyan-600/60 border-cyan-500 shadow-[0_0_4px_rgba(6,182,212,0.5)]' 
-                                          : 'bg-slate-800/40 border-slate-600/50 hover:border-cyan-500/50'
-                                      }`}
-                                    />
+                                    <div key={i} className="flex flex-col items-center gap-1">
+                                      <button
+                                        onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'spelltrap', i, hasCard)}
+                                        className={`w-8 h-10 rounded border-2 transition-all ${
+                                          hasCard 
+                                            ? card.faceUp
+                                              ? 'bg-cyan-600/60 border-cyan-500 shadow-[0_0_4px_rgba(6,182,212,0.5)]' 
+                                              : 'bg-purple-600/60 border-purple-500'
+                                            : 'bg-slate-800/40 border-slate-600/50 hover:border-cyan-500/50'
+                                        }`}
+                                        title={hasCard ? `${card.name} - Click to remove` : 'Click to add card'}
+                                      >
+                                        {hasCard && (
+                                          <span className="text-[6px] text-white truncate px-0.5 leading-tight">
+                                            {card.faceUp ? card.name.substring(0, 4) : '?'}
+                                          </span>
+                                        )}
+                                      </button>
+                                      {hasCard && (
+                                        <button
+                                          onClick={() => handleToggleCardState(participant.id, participant.player_id, 'spelltrap', i)}
+                                          className="text-[8px] px-1 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                          title={card.faceUp ? 'Set face-down' : 'Activate (face-up)'}
+                                        >
+                                          {card.faceUp ? <Eye className="h-2 w-2" /> : <EyeOff className="h-2 w-2" />}
+                                        </button>
+                                      )}
+                                    </div>
                                   )
                                 })}
                               </div>
