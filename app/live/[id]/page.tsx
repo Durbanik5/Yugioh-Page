@@ -64,7 +64,7 @@ function DSoDLifePointDisplay({
       style={style}
     >
       {/* DSoD Name Plate - Blue translucent panel */}
-      <div className={`relative mb-2 ${isCompact ? 'max-w-[160px]' : ''}`}>
+      <div className={`relative mb-1 ${!isCompact ? 'min-w-[240px]' : 'max-w-[160px]'}`}>
         <div className={`
           relative overflow-hidden rounded-md border backdrop-blur-sm
           ${isCurrentTurn 
@@ -78,7 +78,7 @@ function DSoDLifePointDisplay({
           <div className="flex items-center gap-2">
             {/* Player Avatar Circle */}
             <div className={`
-              rounded-full flex items-center justify-center font-bold text-white
+              rounded-full flex items-center justify-center font-bold text-white flex-shrink-0
               ${isCurrentTurn 
                 ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 shadow-lg shadow-cyan-500/30' 
                 : 'bg-gradient-to-br from-slate-500 to-slate-700'}
@@ -87,15 +87,15 @@ function DSoDLifePointDisplay({
               {participant.player.nickname.charAt(0).toUpperCase()}
             </div>
             
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span 
-                className={`font-bold uppercase tracking-wide text-white ${isCompact ? 'text-xs' : 'text-sm'}`}
+                className={`font-bold uppercase tracking-wide text-white truncate ${isCompact ? 'text-xs' : 'text-sm'}`}
                 style={{ fontFamily: 'var(--font-orbitron)' }}
               >
                 {participant.player.nickname}
               </span>
               {participant.deck && (
-                <span className={`text-cyan-300/70 truncate ${isCompact ? 'text-[9px] max-w-[80px]' : 'text-[10px] max-w-[120px]'}`}>
+                <span className={`text-cyan-300/70 truncate ${isCompact ? 'text-[9px] max-w-[80px]' : 'text-[10px] max-w-[160px]'}`}>
                   {participant.deck.name}
                 </span>
               )}
@@ -103,7 +103,7 @@ function DSoDLifePointDisplay({
           </div>
           
           {isCurrentTurn && (
-            <div className="absolute -top-1 -right-1">
+            <div className="absolute -top-1 -right-1 flex-shrink-0">
               <Zap className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
             </div>
           )}
@@ -111,55 +111,54 @@ function DSoDLifePointDisplay({
       </div>
 
       {/* DSoD Life Point Display - Main Panel */}
-      <div className={`relative ${isCompact ? 'max-w-[160px]' : ''}`}>
+      <div className={`relative ${!isCompact ? 'min-w-[240px]' : 'max-w-[160px]'}`}>
         {/* Outer glow for critical LP */}
         {isCriticalLp && (
           <div className="absolute -inset-2 bg-red-500/30 rounded-lg blur-xl animate-pulse" />
         )}
         
         <div className={`
-          relative flex items-center gap-3 rounded-md border backdrop-blur-sm overflow-hidden
+          relative flex items-center gap-2 rounded-md border backdrop-blur-sm overflow-hidden
           ${isCriticalLp 
             ? 'bg-gradient-to-r from-red-900/90 via-red-800/90 to-red-900/90 border-red-500/70' 
             : isLowLp 
             ? 'bg-gradient-to-r from-red-900/80 via-slate-900/90 to-slate-900/90 border-red-400/50' 
             : 'bg-gradient-to-r from-blue-900/80 via-slate-900/90 to-slate-900/90 border-cyan-500/50'}
-          ${isCompact ? 'px-3 py-2' : 'px-4 py-3'}
+          ${isCompact ? 'px-2 py-1.5' : 'px-3 py-2'}
         `}>
           {/* Holographic scan line */}
           <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/5 animate-pulse" style={{ animationDuration: '2s' }} />
           
           {/* LifePoint Label Panel - DSoD Style */}
           <div className={`
-            relative flex flex-col items-start px-2 py-1 rounded border
+            relative flex flex-col items-start px-1.5 py-0.5 rounded border flex-shrink-0
             ${isCriticalLp 
               ? 'bg-gradient-to-b from-red-700/60 to-red-800/60 border-red-500/50' 
               : 'bg-gradient-to-b from-cyan-700/40 to-blue-800/40 border-cyan-500/40'}
-            ${isCompact ? 'min-w-[50px]' : 'min-w-[60px]'}
           `}>
             {/* Cyan accent circle like in the movie */}
             <div className={`
-              absolute -left-1 top-1/2 -translate-y-1/2 rounded-full border-2
+              absolute -left-1 top-1/2 -translate-y-1/2 rounded-full border-2 flex-shrink-0
               ${isCriticalLp ? 'bg-red-500 border-red-400' : 'bg-cyan-500 border-cyan-400'}
-              ${isCompact ? 'w-2 h-2' : 'w-3 h-3'}
+              w-2 h-2
             `}>
               <div className={`absolute inset-0 rounded-full ${isCriticalLp ? 'bg-red-400' : 'bg-cyan-400'} animate-ping opacity-50`} />
             </div>
             
             <span 
-              className={`text-white font-medium tracking-wider ${isCompact ? 'text-[8px]' : 'text-[10px]'}`}
+              className="text-white font-medium tracking-wider text-[7px]"
               style={{ fontFamily: 'var(--font-orbitron)' }}
             >
-              LifePoint
+              LP
             </span>
             
             {/* Segmented LP Bar - DSoD Style */}
-            <div className={`flex gap-0.5 mt-1 ${isCompact ? 'h-1' : 'h-1.5'}`}>
+            <div className="flex gap-0.5 mt-0.5">
               {[...Array(segments)].map((_, i) => (
                 <div
                   key={i}
                   className={`
-                    ${isCompact ? 'w-1.5' : 'w-2'} rounded-sm transition-all duration-300
+                    w-1 h-0.5 rounded-sm transition-all duration-300
                     ${i < filledSegments 
                       ? isCriticalLp 
                         ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.6)]' 
@@ -176,8 +175,8 @@ function DSoDLifePointDisplay({
           {/* Large LP Number - DSoD Style (white, bold, slight italic look) */}
           <div 
             className={`
-              font-black text-white tracking-tight relative
-              ${isCompact ? 'text-3xl' : 'text-5xl'}
+              font-black text-white tracking-tight relative min-w-0
+              ${!isCompact ? 'text-4xl' : 'text-2xl'}
             `}
             style={{ 
               fontFamily: 'var(--font-orbitron)',
