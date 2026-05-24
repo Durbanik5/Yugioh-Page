@@ -71,3 +71,41 @@ export interface PlayerWithStats extends Player {
 export interface MatchWithParticipants extends Match {
   participants: (MatchParticipant & { player: Player; deck: Deck | null })[]
 }
+
+export interface BannedCard {
+  id: string
+  card_name: string
+  card_id: number | null
+  card_image: string | null
+  card_type: string | null
+  reason: string | null
+  banned_at: string
+  banned_by: string | null
+}
+
+export interface BanProposal {
+  id: string
+  card_name: string
+  card_id: number | null
+  card_image: string | null
+  card_type: string | null
+  proposal_type: 'ban' | 'unban'
+  reason: string | null
+  proposed_by: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  resolved_at: string | null
+}
+
+export interface ProposalVote {
+  id: string
+  proposal_id: string
+  player_id: string
+  vote: 'yes' | 'no'
+  voted_at: string
+}
+
+export interface BanProposalWithVotes extends BanProposal {
+  votes: (ProposalVote & { player: Player })[]
+  proposer: Player | null
+}
