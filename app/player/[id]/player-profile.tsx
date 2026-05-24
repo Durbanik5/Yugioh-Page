@@ -9,6 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,7 +37,7 @@ import { createClient } from '@/lib/supabase/client'
 import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
 import { PlayerCollection } from '@/components/player-collection'
-import type { PlayerWithStats, MatchWithParticipants, Player, Deck } from '@/lib/types'
+import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat } from '@/lib/types'
 
 interface PlayerProfileProps {
   player: PlayerWithStats
@@ -231,6 +238,7 @@ function calculateTagTeamRecords(matches: MatchWithParticipants[], playerId: str
 
 export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProps) {
   const [deleting, setDeleting] = useState(false)
+  const [formatFilter, setFormatFilter] = useState<DeckFormat | 'all'>('all')
   const router = useRouter()
   
   const stats = player.stats
@@ -242,6 +250,12 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
   const oneVOneRecords = useMemo(() => calculate1v1Records(matches, player.id, allPlayers), [matches, player.id, allPlayers])
   const ffaStats = useMemo(() => calculateFFAStats(matches, player.id), [matches, player.id])
   const tagTeamRecords = useMemo(() => calculateTagTeamRecords(matches, player.id, allPlayers), [matches, player.id, allPlayers])
+
+  // Filter decks by format
+  const filteredDecks = useMemo(() => {
+    if (formatFilter === 'all') return player.decks
+    return player.decks.filter(deck => (deck.format || 'casual') === formatFilter)
+  }, [player.decks, formatFilter])
 
   // Calculate achievements
   const achievements = useMemo(() => {
@@ -845,19 +859,56 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
 
         {/* Decks Tab */}
         <TabsContent value="decks" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-4">
+            {/* Format Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Format:</span>
+              <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as DeckFormat | 'all')}>
+                <SelectTrigger className="w-32 h-8 text-sm bg-card border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Formats</SelectItem>
+                  <SelectItem value="tcg">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      TCG
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="ocg">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      OCG
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="casual">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Casual
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="text-xs">
+                {filteredDecks.length} deck{filteredDecks.length !== 1 ? 's' : ''}
+              </Badge>
+            </div>
             <AddDeckDialog playerId={player.id} />
           </div>
           
-          {player.decks.length === 0 ? (
+          {filteredDecks.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No decks registered yet.</p>
+                <p className="text-muted-foreground">
+                  {player.decks.length === 0 
+                    ? 'No decks registered yet.' 
+                    : `No ${formatFilter} decks found.`}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {player.decks.map((deck) => (
+              {filteredDecks.map((deck) => (
                 <DeckBuildViewer 
                   key={deck.id} 
                   deck={deck} 

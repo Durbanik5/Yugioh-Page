@@ -6,12 +6,27 @@ export interface Player {
   updated_at: string
 }
 
+export type DeckFormat = 'tcg' | 'ocg' | 'casual'
+
 export interface Deck {
   id: string
   player_id: string
   name: string
   archetype: string | null
   description: string | null
+  banner_url: string | null
+  format: DeckFormat
+  mvp_card_name: string | null
+  created_at: string
+}
+
+export interface DeckChange {
+  id: string
+  deck_id: string
+  change_type: 'added' | 'removed' | 'updated'
+  card_name: string
+  quantity: number
+  category: 'main' | 'extra' | 'side' | null
   created_at: string
 }
 
@@ -60,6 +75,7 @@ export interface DeckCard {
 
 export interface DeckWithCards extends Deck {
   cards: DeckCard[]
+  changes?: DeckChange[]
 }
 
 export interface PlayerWithStats extends Player {

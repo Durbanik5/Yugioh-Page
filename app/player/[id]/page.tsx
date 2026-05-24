@@ -20,7 +20,8 @@ async function getPlayer(id: string): Promise<PlayerWithStats | null> {
       stats:player_stats(*),
       decks(
         *,
-        cards:deck_cards(*)
+        cards:deck_cards(*),
+        changes:deck_changes(*)
       )
     `)
     .eq('id', id)
@@ -36,6 +37,9 @@ async function getPlayer(id: string): Promise<PlayerWithStats | null> {
     decks: (player.decks || []).map((deck: any) => ({
       ...deck,
       cards: deck.cards || [],
+      changes: (deck.changes || []).sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ),
     })),
   }
 }

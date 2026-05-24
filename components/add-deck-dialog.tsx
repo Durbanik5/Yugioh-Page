@@ -14,9 +14,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import type { DeckFormat } from '@/lib/types'
 
 interface AddDeckDialogProps {
   playerId: string
@@ -27,6 +35,7 @@ export function AddDeckDialog({ playerId }: AddDeckDialogProps) {
   const [name, setName] = useState('')
   const [archetype, setArchetype] = useState('')
   const [description, setDescription] = useState('')
+  const [format, setFormat] = useState<DeckFormat>('casual')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -48,6 +57,7 @@ export function AddDeckDialog({ playerId }: AddDeckDialogProps) {
           name: name.trim(),
           archetype: archetype.trim() || null,
           description: description.trim() || null,
+          format: format,
         })
 
       if (error) throw error
@@ -57,6 +67,7 @@ export function AddDeckDialog({ playerId }: AddDeckDialogProps) {
       setName('')
       setArchetype('')
       setDescription('')
+      setFormat('casual')
       router.refresh()
     } catch (error) {
       console.error('Error adding deck:', error)
@@ -95,15 +106,46 @@ export function AddDeckDialog({ playerId }: AddDeckDialogProps) {
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="archetype" className="text-foreground">Archetype</Label>
-            <Input
-              id="archetype"
-              placeholder="e.g., Dragon, Spellcaster, Warrior"
-              value={archetype}
-              onChange={(e) => setArchetype(e.target.value)}
-              className="bg-input border-border focus:border-primary"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="archetype" className="text-foreground">Archetype</Label>
+              <Input
+                id="archetype"
+                placeholder="e.g., Dragon"
+                value={archetype}
+                onChange={(e) => setArchetype(e.target.value)}
+                className="bg-input border-border focus:border-primary"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="format" className="text-foreground">Format</Label>
+              <Select value={format} onValueChange={(v: DeckFormat) => setFormat(v)}>
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tcg">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      TCG
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="ocg">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      OCG
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="casual">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Casual
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
           <div className="space-y-2">

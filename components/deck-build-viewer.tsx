@@ -33,9 +33,9 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw, Search, Loader2, X, Pencil } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw, Search, Loader2, X, Pencil, ImagePlus, Clock, TrendingUp, TrendingDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { DeckWithCards, DeckCard } from '@/lib/types'
+import type { DeckWithCards, DeckCard, DeckFormat, DeckChange } from '@/lib/types'
 
 type DeckCategory = 'main' | 'extra' | 'side'
 
@@ -99,8 +99,12 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
   const [editName, setEditName] = useState(deck.name)
   const [editArchetype, setEditArchetype] = useState(deck.archetype || '')
   const [editDescription, setEditDescription] = useState(deck.description || '')
+  const [editFormat, setEditFormat] = useState<DeckFormat>(deck.format || 'casual')
+  const [editMvpCard, setEditMvpCard] = useState(deck.mvp_card_name || '')
+  const [editBannerUrl, setEditBannerUrl] = useState(deck.banner_url || '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deckChanges, setDeckChanges] = useState<DeckChange[]>(deck.changes || [])
   
   const router = useRouter()
 
@@ -250,6 +254,15 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
 
         setCards([...cards, data])
         toast.success(`Added ${newCard.name} to ${newCard.category === 'main' ? 'Main' : newCard.category === 'extra' ? 'Extra' : 'Side'} Deck`)
+        
+        // Log the change
+        await supabase.from('deck_changes').insert({
+          deck_id: deck.id,
+          change_type: 'added',
+          card_name: newCard.name.trim(),
+          quantity: newCard.quantity,
+          category: newCard.category
+        })
       }
 
       clearSelection()
@@ -265,6 +278,7 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
 
   const handleRemoveCard = async (cardId: string) => {
     const supabase = createClient()
+    const cardToRemove = cards.find(c => c.id === cardId)
 
     try {
       const { error } = await supabase
@@ -276,6 +290,18 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
 
       setCards(cards.filter(c => c.id !== cardId))
       toast.success('Card removed')
+      
+      // Log the change
+      if (cardToRemove) {
+        await supabase.from('deck_changes').insert({
+          deck_id: deck.id,
+          change_type: 'removed',
+          card_name: cardToRemove.card_name,
+          quantity: cardToRemove.quantity,
+          category: cardToRemove.deck_category
+        })
+      }
+      
       router.refresh()
     } catch (error) {
       console.error('Error removing card:', error)
@@ -299,6 +325,9 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
           name: editName.trim(),
           archetype: editArchetype.trim() || null,
           description: editDescription.trim() || null,
+          format: editFormat,
+          mvp_card_name: editMvpCard.trim() || null,
+          banner_url: editBannerUrl.trim() || null,
         })
         .eq('id', deck.id)
 
@@ -422,26 +451,69 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
     </div>
   )
 
+  // Format badge colors
+  const getFormatColor = (format: DeckFormat) => {
+    switch (format) {
+      case 'tcg': return 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+      case 'ocg': return 'bg-red-500/20 text-red-400 border-red-500/50'
+      case 'casual': return 'bg-green-500/20 text-green-400 border-green-500/50'
+    }
+  }
+
+  const formatLabels: Record<DeckFormat, string> = {
+    tcg: 'TCG',
+    ocg: 'OCG',
+    casual: 'Casual'
+  }
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="bg-card border-border">
-        <CardHeader className="p-4 pb-2">
+      <Card className="bg-card border-border overflow-hidden">
+        {/* Banner Image */}
+        {deck.banner_url && (
+          <div className="relative h-24 w-full overflow-hidden">
+            <img 
+              src={deck.banner_url} 
+              alt={`${deck.name} banner`}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
+          </div>
+        )}
+        
+        <CardHeader className={`p-4 pb-2 ${deck.banner_url ? '-mt-8 relative z-10' : ''}`}>
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-                {deck.name}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => setEditDialogOpen(true)}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              </CardTitle>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+                  {deck.name}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => setEditDialogOpen(true)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </CardTitle>
+                {/* Format Badge */}
+                <Badge variant="outline" className={`text-[10px] ${getFormatColor(deck.format || 'casual')}`}>
+                  {formatLabels[deck.format || 'casual']}
+                </Badge>
+              </div>
+              
               {deck.archetype && (
                 <p className="text-sm text-muted-foreground">{deck.archetype}</p>
               )}
+              
+              {/* MVP Card */}
+              {deck.mvp_card_name && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Star className="h-3 w-3 text-yellow-500" />
+                  <span className="text-xs text-yellow-500">MVP: {deck.mvp_card_name}</span>
+                </div>
+              )}
+              
               {record && (record.wins > 0 || record.losses > 0) && (
                 <div className="flex items-center gap-3 mt-1">
                   <span className="flex items-center gap-1 text-sm">
@@ -738,18 +810,70 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Recent Changes Section */}
+            {deckChanges.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" />
+                  Recent Changes
+                </h4>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {deckChanges.slice(0, 5).map((change) => (
+                    <div key={change.id} className="flex items-center gap-2 text-xs">
+                      {change.change_type === 'added' ? (
+                        <TrendingUp className="h-3 w-3 text-green-500" />
+                      ) : change.change_type === 'removed' ? (
+                        <TrendingDown className="h-3 w-3 text-red-500" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3 text-yellow-500" />
+                      )}
+                      <span className={change.change_type === 'added' ? 'text-green-400' : change.change_type === 'removed' ? 'text-red-400' : 'text-yellow-400'}>
+                        {change.change_type === 'added' ? '+' : change.change_type === 'removed' ? '-' : '~'}{change.quantity}
+                      </span>
+                      <span className="text-foreground truncate flex-1">{change.card_name}</span>
+                      <span className="text-muted-foreground">
+                        {new Date(change.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CollapsibleContent>
         </CardContent>
       </Card>
 
       {/* Edit Deck Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="bg-card border-primary/30">
+        <DialogContent className="bg-card border-primary/30 max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: 'var(--font-orbitron)' }}>Edit Deck</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 pt-4">
+            {/* Banner URL */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-banner">Banner Image URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="edit-banner"
+                  placeholder="https://example.com/banner.jpg"
+                  value={editBannerUrl}
+                  onChange={(e) => setEditBannerUrl(e.target.value)}
+                  className="bg-input border-border focus:border-primary flex-1"
+                />
+                <Button variant="outline" size="icon" className="shrink-0">
+                  <ImagePlus className="h-4 w-4" />
+                </Button>
+              </div>
+              {editBannerUrl && (
+                <div className="relative h-20 w-full rounded overflow-hidden">
+                  <img src={editBannerUrl} alt="Banner preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="edit-deck-name">Deck Name *</Label>
               <Input
@@ -761,15 +885,58 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
               />
             </div>
             
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-archetype">Archetype</Label>
+                <Input
+                  id="edit-archetype"
+                  placeholder="e.g., Dragon, Spellcaster"
+                  value={editArchetype}
+                  onChange={(e) => setEditArchetype(e.target.value)}
+                  className="bg-input border-border focus:border-primary"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-format">Format</Label>
+                <Select value={editFormat} onValueChange={(v: DeckFormat) => setEditFormat(v)}>
+                  <SelectTrigger className="bg-input border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tcg">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        TCG
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="ocg">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        OCG
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="casual">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        Casual
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="edit-archetype">Archetype</Label>
+              <Label htmlFor="edit-mvp">MVP Card</Label>
               <Input
-                id="edit-archetype"
-                placeholder="e.g., Dragon, Spellcaster, Warrior"
-                value={editArchetype}
-                onChange={(e) => setEditArchetype(e.target.value)}
+                id="edit-mvp"
+                placeholder="e.g., Blue-Eyes White Dragon"
+                value={editMvpCard}
+                onChange={(e) => setEditMvpCard(e.target.value)}
                 className="bg-input border-border focus:border-primary"
               />
+              <p className="text-xs text-muted-foreground">The most valuable card in your deck</p>
             </div>
             
             <div className="space-y-2">
