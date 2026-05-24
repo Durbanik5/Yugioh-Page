@@ -164,3 +164,24 @@ export interface DuelRoomWithParticipants extends DuelRoom {
   participants: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
   creator: Player | null
 }
+
+export type CardCondition = 'mint' | 'near_mint' | 'lightly_played' | 'moderately_played' | 'heavily_played' | 'damaged'
+
+export interface CollectionCard {
+  id: string
+  player_id: string
+  card_name: string
+  card_id: number | null
+  card_image: string | null
+  card_type: string | null
+  card_race: string | null
+  card_attribute: string | null
+  card_level: number | null
+  card_atk: number | null
+  card_def: number | null
+  quantity: number
+  rarity: string | null
+  condition: CardCondition | null
+  notes: string | null
+  added_at: string
+}

@@ -29,6 +29,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
+import { PlayerCollection } from '@/components/player-collection'
 import type { PlayerWithStats, MatchWithParticipants, Player, Deck } from '@/lib/types'
 
 interface PlayerProfileProps {
@@ -537,6 +538,7 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
           <TabsTrigger value="stats">Statistics</TabsTrigger>
           <TabsTrigger value="decks">Decks ({player.decks.length})</TabsTrigger>
           <TabsTrigger value="matches">Recent Matches</TabsTrigger>
+          <TabsTrigger value="collection">Collection</TabsTrigger>
         </TabsList>
 
         {/* Stats Tab */}
@@ -935,6 +937,11 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* Collection Tab */}
+        <TabsContent value="collection">
+          <PlayerCollection playerId={player.id} />
         </TabsContent>
       </Tabs>
     </main>
