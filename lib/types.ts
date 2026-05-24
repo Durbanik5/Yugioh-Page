@@ -111,7 +111,7 @@ export interface BanProposalWithVotes extends BanProposal {
 }
 
 export type DuelRoomStatus = 'waiting' | 'active' | 'finished'
-export type TurnPhase = 'draw' | 'standby' | 'main' | 'battle' | 'end'
+export type TurnPhase = 'draw' | 'standby' | 'main' | 'battle' | 'main2' | 'end'
 
 export interface DuelRoom {
   id: string

@@ -28,6 +28,171 @@ interface RoomData extends DuelRoom {
   creator: Player | null
 }
 
+// Dark Side of Dimensions Style LP Display Component
+function DSoDLifePointDisplay({ 
+  participant, 
+  isCurrentTurn,
+  position,
+  totalDuelists
+}: { 
+  participant: DuelRoomParticipant & { player: Player; deck: Deck | null }
+  isCurrentTurn: boolean
+  position?: { angle: number; radius: number }
+  totalDuelists: number
+}) {
+  const lpPercentage = (participant.life_points / 8000) * 100
+  const isLowLp = participant.life_points <= 2000
+  const isCriticalLp = participant.life_points <= 1000
+  const isMidLp = participant.life_points <= 4000 && participant.life_points > 2000
+
+  // Calculate position for circular layout (FFA)
+  const style = position ? {
+    position: 'absolute' as const,
+    left: `calc(50% + ${Math.cos(position.angle) * position.radius}px)`,
+    top: `calc(50% + ${Math.sin(position.angle) * position.radius}px)`,
+    transform: 'translate(-50%, -50%)',
+  } : {}
+
+  return (
+    <div 
+      className={`flex flex-col items-center transition-all duration-500 ${
+        isCurrentTurn ? 'scale-105 z-20' : 'scale-100 opacity-90'
+      } ${totalDuelists > 2 ? 'max-w-[140px]' : ''}`}
+      style={style}
+    >
+      {/* Player Avatar - DSoD Style hexagonal glow */}
+      <div className={`relative mb-3 ${isCurrentTurn ? '' : ''}`}>
+        <div className={`absolute inset-0 ${isCurrentTurn ? 'animate-pulse' : ''}`}>
+          <div className={`absolute -inset-2 rounded-full blur-lg ${
+            isCurrentTurn ? 'bg-cyan-500/50' : 'bg-transparent'
+          }`} />
+        </div>
+        <div className={`relative w-16 h-16 ${totalDuelists > 3 ? 'w-12 h-12' : 'w-16 h-16'} rounded-full flex items-center justify-center text-2xl font-bold transition-all ${
+          isCurrentTurn 
+            ? 'bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/50 border-2 border-cyan-300' 
+            : 'bg-gradient-to-br from-slate-700 to-slate-800 text-slate-300 border-2 border-slate-600'
+        }`}>
+          {participant.player.nickname.charAt(0).toUpperCase()}
+        </div>
+        {isCurrentTurn && (
+          <div className="absolute -top-1 -right-1">
+            <div className="relative">
+              <Zap className="h-5 w-5 text-yellow-400 animate-bounce" />
+              <div className="absolute inset-0 blur-sm bg-yellow-400/50 rounded-full" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Player Name */}
+      <h3 className={`font-bold mb-1 text-center ${totalDuelists > 3 ? 'text-sm' : 'text-lg'} ${
+        isCurrentTurn ? 'text-cyan-400' : 'text-white'
+      }`} style={{ fontFamily: 'var(--font-orbitron)' }}>
+        {participant.player.nickname}
+      </h3>
+
+      {/* Deck Name */}
+      {participant.deck && (
+        <p className={`text-muted-foreground mb-2 text-center truncate max-w-full ${totalDuelists > 3 ? 'text-[10px]' : 'text-xs'}`}>
+          {participant.deck.name}
+        </p>
+      )}
+
+      {/* DSoD Style Life Points Display */}
+      <div className="relative">
+        {/* Outer glow ring */}
+        <div className={`absolute -inset-3 rounded-2xl blur-xl transition-all duration-500 ${
+          isCriticalLp 
+            ? 'bg-red-600/60 animate-pulse' 
+            : isLowLp 
+            ? 'bg-red-500/40' 
+            : isMidLp 
+            ? 'bg-yellow-500/30' 
+            : 'bg-cyan-500/30'
+        }`} />
+        
+        {/* Inner LP container - DSoD holographic style */}
+        <div className={`relative overflow-hidden rounded-xl border-2 backdrop-blur-md transition-all duration-300 ${
+          totalDuelists > 3 ? 'px-4 py-2' : 'px-6 py-3'
+        } ${
+          isCriticalLp 
+            ? 'border-red-500 bg-gradient-to-b from-red-950/90 to-red-900/80' 
+            : isLowLp 
+            ? 'border-red-400 bg-gradient-to-b from-red-950/80 to-slate-900/90' 
+            : isMidLp 
+            ? 'border-yellow-400 bg-gradient-to-b from-yellow-950/60 to-slate-900/90' 
+            : 'border-cyan-400 bg-gradient-to-b from-cyan-950/60 to-slate-900/90'
+        }`}>
+          {/* Holographic scan line effect */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent animate-pulse" 
+                 style={{ animationDuration: '2s' }} />
+          </div>
+          
+          {/* Digital circuit pattern overlay */}
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: `linear-gradient(90deg, transparent 24%, rgba(6, 182, 212, 0.3) 25%, rgba(6, 182, 212, 0.3) 26%, transparent 27%, transparent 74%, rgba(6, 182, 212, 0.3) 75%, rgba(6, 182, 212, 0.3) 76%, transparent 77%),
+              linear-gradient(transparent 24%, rgba(6, 182, 212, 0.3) 25%, rgba(6, 182, 212, 0.3) 26%, transparent 27%, transparent 74%, rgba(6, 182, 212, 0.3) 75%, rgba(6, 182, 212, 0.3) 76%, transparent 77%)`,
+            backgroundSize: '20px 20px',
+          }} />
+
+          {/* LP Number */}
+          <div className={`relative font-mono font-black tracking-tight text-center ${
+            totalDuelists > 3 ? 'text-2xl' : 'text-4xl'
+          } ${
+            isCriticalLp 
+              ? 'text-red-400' 
+              : isLowLp 
+              ? 'text-red-400' 
+              : isMidLp 
+              ? 'text-yellow-400' 
+              : 'text-cyan-400'
+          }`} style={{ 
+            textShadow: isCriticalLp 
+              ? '0 0 20px rgba(239, 68, 68, 0.8), 0 0 40px rgba(239, 68, 68, 0.4)' 
+              : isLowLp 
+              ? '0 0 15px rgba(239, 68, 68, 0.6)' 
+              : isMidLp 
+              ? '0 0 15px rgba(234, 179, 8, 0.6)' 
+              : '0 0 15px rgba(6, 182, 212, 0.6), 0 0 30px rgba(6, 182, 212, 0.3)'
+          }}>
+            {participant.life_points.toLocaleString()}
+          </div>
+          
+          {/* LP Label */}
+          <div className={`text-center text-muted-foreground uppercase tracking-widest ${
+            totalDuelists > 3 ? 'text-[8px] mt-0.5' : 'text-[10px] mt-1'
+          }`}>
+            LP
+          </div>
+        </div>
+      </div>
+
+      {/* LP Bar - DSoD style segmented */}
+      <div className={`bg-slate-800/50 rounded-full mt-3 overflow-hidden border border-slate-700 ${
+        totalDuelists > 3 ? 'w-24 h-1.5' : 'w-36 h-2'
+      }`}>
+        <div 
+          className={`h-full rounded-full transition-all duration-500 relative overflow-hidden ${
+            isCriticalLp 
+              ? 'bg-gradient-to-r from-red-600 to-red-500' 
+              : isLowLp 
+              ? 'bg-gradient-to-r from-red-500 to-red-400' 
+              : isMidLp 
+              ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' 
+              : 'bg-gradient-to-r from-cyan-500 to-cyan-400'
+          }`}
+          style={{ width: `${lpPercentage}%` }}
+        >
+          {/* Shimmer effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" 
+               style={{ animationDuration: '2s' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Spectator Screen Component - The main visual display for the duel
 function SpectatorScreen({ 
   room, 
@@ -38,18 +203,26 @@ function SpectatorScreen({
   duelists: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
   currentTurnPlayer: (DuelRoomParticipant & { player: Player; deck: Deck | null }) | undefined
 }) {
-  const phases: TurnPhase[] = ['draw', 'standby', 'main', 'battle', 'end']
+  const phases: { key: TurnPhase; label: string }[] = [
+    { key: 'draw', label: 'DP' },
+    { key: 'standby', label: 'SP' },
+    { key: 'main', label: 'MP1' },
+    { key: 'battle', label: 'BP' },
+    { key: 'main2', label: 'MP2' },
+    { key: 'end', label: 'EP' },
+  ]
   
   if (room.status === 'waiting') {
     return (
-      <div className="relative aspect-video bg-gradient-to-br from-background via-card to-background rounded-xl border-2 border-border overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
+      <div className="relative aspect-video bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-xl border-2 border-cyan-500/20 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent" />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div className="text-center space-y-4">
             <div className="relative">
-              <Monitor className="h-20 w-20 mx-auto text-primary/50 animate-pulse" />
+              <Monitor className="h-20 w-20 mx-auto text-cyan-500/50 animate-pulse" />
+              <div className="absolute inset-0 blur-xl bg-cyan-500/20" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            <h2 className="text-2xl font-bold text-cyan-400" style={{ fontFamily: 'var(--font-orbitron)' }}>
               WAITING FOR DUELISTS
             </h2>
             <p className="text-muted-foreground">
@@ -57,7 +230,7 @@ function SpectatorScreen({
             </p>
             <div className="flex items-center justify-center gap-2 mt-4">
               <span className="text-muted-foreground">Room Code:</span>
-              <span className="font-mono text-2xl text-primary font-bold tracking-wider">{room.room_code}</span>
+              <span className="font-mono text-2xl text-cyan-400 font-bold tracking-wider">{room.room_code}</span>
             </div>
           </div>
         </div>
@@ -68,15 +241,15 @@ function SpectatorScreen({
   if (room.status === 'finished') {
     const winner = duelists.find(d => d.player_id === room.winner_id)
     return (
-      <div className="relative aspect-video bg-gradient-to-br from-background via-card to-background rounded-xl border-2 border-primary/50 overflow-hidden">
+      <div className="relative aspect-video bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-xl border-2 border-yellow-500/50 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/20 via-transparent to-transparent" />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <Trophy className="h-24 w-24 text-yellow-500 mb-4" />
-          <h2 className="text-3xl font-bold text-foreground mb-2" style={{ fontFamily: 'var(--font-orbitron)' }}>
+          <h2 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'var(--font-orbitron)' }}>
             DUEL FINISHED
           </h2>
           {winner ? (
-            <p className="text-2xl text-yellow-500 font-bold">
+            <p className="text-2xl text-yellow-400 font-bold" style={{ fontFamily: 'var(--font-orbitron)' }}>
               {winner.player.nickname} WINS!
             </p>
           ) : (
@@ -87,33 +260,56 @@ function SpectatorScreen({
     )
   }
 
-  // Active duel display
+  // Active duel display - Check if FFA with many participants
+  const isFFA = room.match_type === 'free_for_all' && duelists.length > 2
+
   return (
-    <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl border-2 border-primary/30 overflow-hidden shadow-2xl shadow-primary/10">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-      <div className="absolute inset-0 opacity-30" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2306b6d4' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-      }} />
+    <div className="relative aspect-video bg-gradient-to-br from-slate-950 via-[#0a1628] to-slate-950 rounded-xl border-2 border-cyan-500/30 overflow-hidden shadow-2xl shadow-cyan-500/10">
+      {/* DSoD Background - Dark blue with digital effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 via-transparent to-transparent" />
       
-      {/* Turn and Phase Info - Top Center */}
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 opacity-20" style={{
+        backgroundImage: `linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px)`,
+        backgroundSize: '40px 40px',
+      }} />
+
+      {/* Animated particles effect */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-cyan-400/40 rounded-full animate-float"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${5 + Math.random() * 5}s`,
+            }}
+          />
+        ))}
+      </div>
+      
+      {/* Turn and Phase Info - Top Center - DSoD Style */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10">
-        <div className="bg-black/60 backdrop-blur-sm px-6 py-2 rounded-full border border-primary/50">
-          <span className="text-primary font-bold text-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
+        <div className="bg-slate-900/80 backdrop-blur-md px-6 py-2 rounded-lg border border-cyan-500/50 shadow-lg shadow-cyan-500/20">
+          <span className="text-cyan-400 font-bold text-lg tracking-wider" style={{ fontFamily: 'var(--font-orbitron)' }}>
             TURN {room.turn_count}
           </span>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 bg-slate-900/60 backdrop-blur-sm p-1 rounded-lg border border-slate-700">
           {phases.map((phase) => (
             <div
-              key={phase}
-              className={`px-3 py-1 rounded text-xs font-medium uppercase transition-all ${
-                room.turn_phase === phase 
-                  ? 'bg-primary text-primary-foreground scale-110' 
-                  : 'bg-black/40 text-muted-foreground'
+              key={phase.key}
+              className={`px-3 py-1 rounded text-xs font-bold uppercase transition-all ${
+                room.turn_phase === phase.key 
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/50' 
+                  : 'bg-transparent text-slate-500 hover:text-slate-400'
               }`}
+              style={{ fontFamily: 'var(--font-orbitron)' }}
             >
-              {phase}
+              {phase.label}
             </div>
           ))}
         </div>
@@ -121,120 +317,79 @@ function SpectatorScreen({
 
       {/* Current Turn Player Indicator */}
       {currentTurnPlayer && (
-        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-yellow-500/50 z-10">
+        <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-lg border border-yellow-500/50 z-10">
           <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-yellow-500 animate-pulse" />
-            <span className="text-yellow-500 font-medium text-sm">
+            <Zap className="h-4 w-4 text-yellow-400 animate-pulse" />
+            <span className="text-yellow-400 font-medium text-sm" style={{ fontFamily: 'var(--font-orbitron)' }}>
               {currentTurnPlayer.player.nickname}&apos;s Turn
             </span>
           </div>
         </div>
       )}
 
-      {/* VS Display */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="text-6xl font-black text-primary/20" style={{ fontFamily: 'var(--font-orbitron)' }}>
-          VS
-        </div>
-      </div>
-
       {/* Duelists Display */}
-      <div className="absolute inset-0 flex items-center justify-around px-8">
-        {duelists.map((participant, index) => {
-          const isCurrentTurn = room.current_turn_player_id === participant.player_id
-          const lpPercentage = (participant.life_points / 8000) * 100
-          const isLowLp = participant.life_points <= 2000
-          const isMidLp = participant.life_points <= 4000 && participant.life_points > 2000
+      {isFFA ? (
+        // Circular layout for FFA with many participants
+        <div className="absolute inset-0 flex items-center justify-center">
+          {/* VS in center */}
+          <div className="absolute text-5xl font-black text-cyan-500/10 pointer-events-none" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            FFA
+          </div>
           
-          return (
-            <div 
-              key={participant.id} 
-              className={`flex flex-col items-center transition-all duration-500 ${
-                isCurrentTurn ? 'scale-105' : 'scale-100 opacity-90'
-              }`}
-            >
-              {/* Player Avatar/Icon */}
-              <div className={`relative mb-4 ${isCurrentTurn ? 'animate-pulse' : ''}`}>
-                <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold border-4 transition-all ${
-                  isCurrentTurn 
-                    ? 'border-primary bg-primary/20 text-primary shadow-lg shadow-primary/50' 
-                    : 'border-muted bg-muted/20 text-muted-foreground'
-                }`}>
-                  {participant.player.nickname.charAt(0).toUpperCase()}
-                </div>
-                {isCurrentTurn && (
-                  <div className="absolute -top-1 -right-1">
-                    <Zap className="h-6 w-6 text-yellow-500 animate-bounce" />
-                  </div>
-                )}
-              </div>
-
-              {/* Player Name */}
-              <h3 className={`text-xl font-bold mb-1 ${
-                isCurrentTurn ? 'text-primary' : 'text-foreground'
-              }`} style={{ fontFamily: 'var(--font-orbitron)' }}>
-                {participant.player.nickname}
-              </h3>
-
-              {/* Deck Name */}
-              {participant.deck && (
-                <p className="text-xs text-muted-foreground mb-3">
-                  {participant.deck.name}
-                </p>
-              )}
-
-              {/* Life Points Display */}
-              <div className="relative">
-                {/* LP Background glow effect */}
-                <div className={`absolute inset-0 blur-xl rounded-full ${
-                  isLowLp ? 'bg-red-500/30' : isMidLp ? 'bg-yellow-500/20' : 'bg-primary/20'
-                }`} />
-                
-                <div className={`relative px-8 py-4 rounded-xl border-2 backdrop-blur-sm ${
-                  isLowLp 
-                    ? 'border-red-500 bg-red-950/50' 
-                    : isMidLp 
-                    ? 'border-yellow-500 bg-yellow-950/50' 
-                    : 'border-primary bg-primary/10'
-                }`}>
-                  <div className={`text-5xl font-mono font-black tracking-tight ${
-                    isLowLp ? 'text-red-500' : isMidLp ? 'text-yellow-500' : 'text-primary'
-                  }`}>
-                    {participant.life_points.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-center text-muted-foreground mt-1 uppercase tracking-widest">
-                    Life Points
-                  </div>
-                </div>
-              </div>
-
-              {/* LP Bar */}
-              <div className="w-48 h-2 bg-muted/30 rounded-full mt-4 overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    isLowLp ? 'bg-red-500' : isMidLp ? 'bg-yellow-500' : 'bg-primary'
-                  }`}
-                  style={{ width: `${lpPercentage}%` }}
+          {/* Circular arrangement */}
+          <div className="relative w-full h-full">
+            {duelists.map((participant, index) => {
+              const angle = (index * (2 * Math.PI / duelists.length)) - (Math.PI / 2)
+              const radius = Math.min(280, Math.max(150, 350 - (duelists.length * 20)))
+              
+              return (
+                <DSoDLifePointDisplay
+                  key={participant.id}
+                  participant={participant}
+                  isCurrentTurn={room.current_turn_player_id === participant.player_id}
+                  position={{ angle, radius }}
+                  totalDuelists={duelists.length}
                 />
-              </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        // Standard 1v1 or small FFA layout
+        <div className="absolute inset-0 flex items-center justify-around px-8">
+          {/* VS Display for 1v1 */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-7xl font-black text-cyan-500/10" style={{ fontFamily: 'var(--font-orbitron)' }}>
+              VS
             </div>
-          )
-        })}
-      </div>
+          </div>
+          
+          {duelists.map((participant) => (
+            <DSoDLifePointDisplay
+              key={participant.id}
+              participant={participant}
+              isCurrentTurn={room.current_turn_player_id === participant.player_id}
+              totalDuelists={duelists.length}
+            />
+          ))}
+        </div>
+      )}
 
-      {/* Live Indicator */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full">
+      {/* Live Indicator - DSoD Style */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-red-500/50">
         <span className="relative flex h-3 w-3">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
         </span>
-        <span className="text-xs font-medium text-red-400 uppercase tracking-wider">Live</span>
+        <span className="text-xs font-bold text-red-400 uppercase tracking-wider" style={{ fontFamily: 'var(--font-orbitron)' }}>
+          LIVE
+        </span>
       </div>
 
       {/* Match Type Badge */}
-      <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full">
-        <span className="text-xs text-muted-foreground">
-          {room.match_type === '1v1' ? '1v1 Duel' : room.match_type === 'free_for_all' ? 'Free-For-All' : 'Tag Team'}
+      <div className="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700">
+        <span className="text-xs text-cyan-400 font-medium" style={{ fontFamily: 'var(--font-orbitron)' }}>
+          {room.match_type === '1v1' ? '1v1 DUEL' : room.match_type === 'free_for_all' ? 'FREE-FOR-ALL' : 'TAG TEAM'}
         </span>
       </div>
     </div>
@@ -266,6 +421,11 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   
   const chatEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+
+  const isHost = room?.created_by === selectedPlayer
+  const duelists = room?.participants.filter(p => !p.is_spectator) || []
+  const spectators = room?.participants.filter(p => p.is_spectator) || []
+  const currentTurnPlayer = duelists.find(p => p.player_id === room?.current_turn_player_id)
 
   useEffect(() => {
     fetchData()
@@ -410,7 +570,6 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const handleStartDuel = async () => {
     if (!room) return
     
-    const duelists = room.participants.filter(p => !p.is_spectator)
     if (duelists.length < 2) {
       toast.error('Need at least 2 duelists to start')
       return
@@ -485,7 +644,6 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const handleNextTurn = async () => {
     if (!room) return
     
-    const duelists = room.participants.filter(p => !p.is_spectator)
     const currentIndex = duelists.findIndex(p => p.player_id === room.current_turn_player_id)
     const nextIndex = (currentIndex + 1) % duelists.length
     const nextPlayer = duelists[nextIndex]
@@ -515,10 +673,19 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       .update({ turn_phase: phase })
       .eq('id', id)
 
+    const phaseLabels: Record<TurnPhase, string> = {
+      draw: 'Draw Phase',
+      standby: 'Standby Phase',
+      main: 'Main Phase 1',
+      battle: 'Battle Phase',
+      main2: 'Main Phase 2',
+      end: 'End Phase'
+    }
+
     await supabase.from('duel_room_events').insert({
       room_id: id,
       event_type: 'phase_change',
-      description: `Phase: ${phase.charAt(0).toUpperCase() + phase.slice(1)}`,
+      description: `Phase: ${phaseLabels[phase]}`,
     })
   }
 
@@ -610,7 +777,9 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-4 py-8">
-          <div className="text-center py-12 text-muted-foreground">Loading duel room...</div>
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-pulse text-muted-foreground">Loading duel room...</div>
+          </div>
         </main>
       </div>
     )
@@ -621,10 +790,10 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">Room not found</p>
-            <Button asChild variant="outline">
-              <Link href="/live">Back to Live Duels</Link>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-foreground mb-4">Room Not Found</h1>
+            <Button asChild>
+              <Link href="/live">Back to Live Rooms</Link>
             </Button>
           </div>
         </main>
@@ -632,52 +801,40 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     )
   }
 
-  const duelists = room.participants.filter(p => !p.is_spectator)
-  const spectators = room.participants.filter(p => p.is_spectator)
-  const currentTurnPlayer = duelists.find(p => p.player_id === room.current_turn_player_id)
-  const isHost = selectedPlayer === room.created_by
-  const canControl = isDuelist || isHost
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-4">
-        {/* Top Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+      <main className="container mx-auto px-4 py-6">
+        {/* Room Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/live" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/live">
+                <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-3" style={{ fontFamily: 'var(--font-orbitron)' }}>
                 {room.name}
-                <Badge 
-                  variant={room.status === 'active' ? 'default' : room.status === 'finished' ? 'secondary' : 'outline'}
-                  className={room.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' : ''}
-                >
-                  {room.status === 'active' && <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse mr-1" />}
-                  {room.status.toUpperCase()}
+                <Badge variant={room.status === 'active' ? 'default' : room.status === 'finished' ? 'secondary' : 'outline'}>
+                  {room.status}
                 </Badge>
               </h1>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <button 
-                  onClick={copyRoomCode} 
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                >
-                  <span className="font-mono">{room.room_code}</span>
-                  <Copy className="h-3 w-3" />
-                </button>
-                <span>•</span>
-                <span>{room.match_type === '1v1' ? '1v1' : room.match_type === 'free_for_all' ? 'FFA' : 'Tag Team'}</span>
+              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5 cursor-pointer hover:text-foreground" onClick={copyRoomCode}>
+                  Code: <span className="font-mono text-cyan-400">{room.room_code}</span>
+                  <Copy className="h-3.5 w-3.5" />
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4" />
+                  {duelists.length} duelists, {spectators.length} spectators
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Player selector */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Player Selection */}
             <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
               <SelectTrigger className="w-[160px] bg-input border-border">
                 <SelectValue placeholder="Select yourself..." />
@@ -691,42 +848,34 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </SelectContent>
             </Select>
 
-            {!isParticipant && selectedPlayer && (
+            {/* Join Room */}
+            {selectedPlayer && !isParticipant && (
               <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-primary hover:bg-primary/80">
-                    Join Room
-                  </Button>
+                  <Button>Join Room</Button>
                 </DialogTrigger>
-                <DialogContent className="bg-card border-border">
+                <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Join Duel Room</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div className="flex gap-2">
-                      <Button
-                        variant={joinAsDuelist ? 'default' : 'outline'}
-                        className="flex-1"
-                        onClick={() => setJoinAsDuelist(true)}
-                      >
-                        <Swords className="h-4 w-4 mr-2" />
-                        Duelist
-                      </Button>
-                      <Button
-                        variant={!joinAsDuelist ? 'default' : 'outline'}
-                        className="flex-1"
-                        onClick={() => setJoinAsDuelist(false)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Spectator
-                      </Button>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Join as</Label>
+                      <Select value={joinAsDuelist ? 'duelist' : 'spectator'} onValueChange={(v) => setJoinAsDuelist(v === 'duelist')}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="duelist">Duelist</SelectItem>
+                          <SelectItem value="spectator">Spectator</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-
                     {joinAsDuelist && (
-                      <div>
-                        <Label className="text-muted-foreground">Select Deck (optional)</Label>
+                      <div className="space-y-2">
+                        <Label>Select Deck (Optional)</Label>
                         <Select value={selectedDeck} onValueChange={setSelectedDeck}>
-                          <SelectTrigger className="bg-input border-border mt-1">
+                          <SelectTrigger>
                             <SelectValue placeholder="Choose a deck..." />
                           </SelectTrigger>
                           <SelectContent>
@@ -739,15 +888,15 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                         </Select>
                       </div>
                     )}
-
                     <Button onClick={handleJoinRoom} className="w-full">
-                      Join as {joinAsDuelist ? 'Duelist' : 'Spectator'}
+                      Join Room
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
             )}
 
+            {/* Start Duel */}
             {room.status === 'waiting' && isHost && duelists.length >= 2 && (
               <Button onClick={handleStartDuel} className="bg-green-600 hover:bg-green-700">
                 <Play className="h-4 w-4 mr-2" />
@@ -755,6 +904,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Button>
             )}
 
+            {/* End Duel button for host during active duel */}
             {room.status === 'active' && isHost && (
               <Button onClick={handleEndDuelNoWinner} variant="destructive">
                 <Square className="h-4 w-4 mr-2" />
@@ -762,6 +912,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Button>
             )}
 
+            {/* Leave Room button for participants (not host) */}
             {isParticipant && !isHost && room.status !== 'active' && (
               <Button onClick={handleLeaveRoom} variant="outline">
                 <LogOut className="h-4 w-4 mr-2" />
@@ -769,6 +920,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Button>
             )}
 
+            {/* Delete Room button for host when not active */}
             {isHost && room.status !== 'active' && (
               <Button onClick={handleDeleteRoom} variant="destructive" size="sm">
                 <X className="h-4 w-4 mr-2" />
@@ -778,101 +930,147 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
           </div>
         </div>
 
-        {/* MAIN SPECTATOR SCREEN */}
+        {/* Main Spectator Screen */}
         <div className="mb-6">
           <SpectatorScreen room={room} duelists={duelists} currentTurnPlayer={currentTurnPlayer} />
         </div>
 
         {/* Stream Embed (if available) */}
         {room.stream_url && (
-          <Card className="bg-card border-border overflow-hidden mb-6">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Monitor className="h-4 w-4" />
-                Live Stream
-              </CardTitle>
-            </CardHeader>
-            <div className="aspect-video bg-black">
-              {room.stream_url.includes('youtube') || room.stream_url.includes('youtu.be') ? (
+          <Card className="mb-6 bg-card border-border">
+            <CardContent className="p-4">
+              <div className="aspect-video bg-black rounded-lg overflow-hidden">
                 <iframe
                   src={room.stream_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
                   className="w-full h-full"
+                  allowFullScreen
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
                 />
-              ) : room.stream_url.includes('twitch') ? (
-                <iframe
-                  src={`https://player.twitch.tv/?channel=${room.stream_url.split('/').pop()}&parent=${typeof window !== 'undefined' ? window.location.hostname : ''}`}
-                  className="w-full h-full"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <a href={room.stream_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    Open Stream Link
-                  </a>
-                </div>
-              )}
-            </div>
+              </div>
+            </CardContent>
           </Card>
         )}
 
-        {/* Controls and Info Grid */}
-        <div className="grid gap-4 lg:grid-cols-3">
-          {/* Left Column - Controls */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Life Point Controls (for duelists/host) */}
-            {room.status === 'active' && canControl && (
+        {/* Controls Grid */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column - Duelist Controls */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Phase & Turn Controls */}
+            {room.status === 'active' && (isDuelist || isHost) && (
               <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Life Point Controls</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-cyan-400" />
+                    Turn Controls
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                <CardContent className="space-y-4">
+                  {/* Phase Buttons */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Phase</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'draw' as TurnPhase, label: 'Draw' },
+                        { key: 'standby' as TurnPhase, label: 'Standby' },
+                        { key: 'main' as TurnPhase, label: 'Main 1' },
+                        { key: 'battle' as TurnPhase, label: 'Battle' },
+                        { key: 'main2' as TurnPhase, label: 'Main 2' },
+                        { key: 'end' as TurnPhase, label: 'End' },
+                      ].map((phase) => (
+                        <Button
+                          key={phase.key}
+                          size="sm"
+                          variant={room.turn_phase === phase.key ? 'default' : 'outline'}
+                          onClick={() => handlePhaseChange(phase.key)}
+                          className={room.turn_phase === phase.key ? 'bg-cyan-600 hover:bg-cyan-700' : ''}
+                        >
+                          {phase.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Next Turn */}
+                  <Button onClick={handleNextTurn} className="w-full">
+                    <SkipForward className="h-4 w-4 mr-2" />
+                    Next Turn
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Life Point Controls */}
+            {room.status === 'active' && (isDuelist || isHost) && (
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Heart className="h-5 w-5 text-red-400" />
+                    Life Point Controls
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* LP Change Amount */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Change Amount</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      {[100, 500, 1000, 2000, 4000].map((amount) => (
+                        <Button
+                          key={amount}
+                          size="sm"
+                          variant={lpChangeAmount === amount ? 'default' : 'outline'}
+                          onClick={() => setLpChangeAmount(amount)}
+                        >
+                          {amount}
+                        </Button>
+                      ))}
+                      <Input
+                        type="number"
+                        value={lpChangeAmount}
+                        onChange={(e) => setLpChangeAmount(Number(e.target.value))}
+                        className="w-24 bg-input border-border"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Per-Duelist Controls */}
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {duelists.map((participant) => (
-                      <div key={participant.id} className="p-4 rounded-lg bg-background/50 border border-border">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-medium text-foreground">{participant.player.nickname}</span>
-                          <span className={`text-2xl font-mono font-bold ${
-                            participant.life_points <= 2000 ? 'text-red-500' : 
-                            participant.life_points <= 4000 ? 'text-yellow-500' : 'text-primary'
-                          }`}>
-                            {participant.life_points}
-                          </span>
+                      <div key={participant.id} className="p-3 rounded-lg bg-background border border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-sm">{participant.player.nickname}</span>
+                          <span className="font-mono text-cyan-400">{participant.life_points} LP</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 w-8 p-0"
+                            className="flex-1 text-red-400 border-red-400/50 hover:bg-red-400/10"
                             onClick={() => handleLifePointChange(participant.id, participant.player_id, participant.life_points, -lpChangeAmount)}
                           >
-                            <Minus className="h-4 w-4" />
+                            <Minus className="h-4 w-4 mr-1" />
+                            {lpChangeAmount}
                           </Button>
-                          <Input
-                            type="number"
-                            value={lpChangeAmount}
-                            onChange={(e) => setLpChangeAmount(parseInt(e.target.value) || 0)}
-                            className="h-8 text-center bg-input border-border"
-                          />
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 w-8 p-0"
+                            className="flex-1 text-green-400 border-green-400/50 hover:bg-green-400/10"
                             onClick={() => handleLifePointChange(participant.id, participant.player_id, participant.life_points, lpChangeAmount)}
                           >
-                            <Plus className="h-4 w-4" />
+                            <Plus className="h-4 w-4 mr-1" />
+                            {lpChangeAmount}
                           </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="w-full mt-2 text-xs"
-                          onClick={() => handleEndDuel(participant.player_id)}
-                        >
-                          <Trophy className="h-3 w-3 mr-1" />
-                          Declare Winner
-                        </Button>
+                        {isHost && room.status === 'active' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="w-full mt-2 text-yellow-400 hover:bg-yellow-400/10"
+                            onClick={() => handleEndDuel(participant.player_id)}
+                          >
+                            <Trophy className="h-4 w-4 mr-1" />
+                            Declare Winner
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -880,49 +1078,25 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               </Card>
             )}
 
-            {/* Turn Controls */}
-            {room.status === 'active' && canControl && (
-              <Card className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Phase:</span>
-                      {(['draw', 'standby', 'main', 'battle', 'end'] as TurnPhase[]).map((phase) => (
-                        <Button
-                          key={phase}
-                          size="sm"
-                          variant={room.turn_phase === phase ? 'default' : 'outline'}
-                          onClick={() => handlePhaseChange(phase)}
-                          className="capitalize"
-                        >
-                          {phase}
-                        </Button>
-                      ))}
-                    </div>
-                    <Button onClick={handleNextTurn} className="bg-primary hover:bg-primary/80">
-                      <SkipForward className="h-4 w-4 mr-2" />
-                      Next Turn
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Custom Event */}
-            {room.status === 'active' && canControl && (
+            {room.status === 'active' && (isDuelist || isHost) && (
               <Card className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-purple-400" />
+                    Log Event
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
                     <Input
+                      placeholder="Card activated, effect resolved..."
                       value={customEventText}
                       onChange={(e) => setCustomEventText(e.target.value)}
-                      placeholder="Log a custom event (e.g., 'Blue-Eyes summoned')"
-                      className="bg-input border-border"
                       onKeyDown={(e) => e.key === 'Enter' && handleCustomEvent()}
+                      className="bg-input border-border"
                     />
-                    <Button onClick={handleCustomEvent} variant="outline">
-                      Log Event
-                    </Button>
+                    <Button onClick={handleCustomEvent}>Log</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -930,80 +1104,89 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
             {/* Event Log */}
             <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Event Log</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Swords className="h-5 w-5 text-cyan-400" />
+                  Duel Log
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-48">
-                  {events.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">No events yet</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {events.map((event) => (
+                  <div className="space-y-2">
+                    {events.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No events yet</p>
+                    ) : (
+                      events.map((event) => (
                         <div key={event.id} className="flex items-start gap-2 text-sm">
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {new Date(event.created_at).toLocaleTimeString()}
                           </span>
-                          <span className={`
-                            ${event.event_type === 'life_change' ? 'text-yellow-500' : ''}
-                            ${event.event_type === 'turn_change' ? 'text-primary' : ''}
-                            ${event.event_type === 'game_start' ? 'text-green-500' : ''}
-                            ${event.event_type === 'game_end' ? 'text-red-500' : ''}
-                            ${event.event_type === 'custom' ? 'text-cyan-400' : ''}
-                          `}>
+                          <span className={`${
+                            event.event_type === 'game_start' ? 'text-green-400' :
+                            event.event_type === 'game_end' ? 'text-yellow-400' :
+                            event.event_type === 'life_change' ? 'text-red-400' :
+                            event.event_type === 'turn_change' ? 'text-cyan-400' :
+                            'text-foreground'
+                          }`}>
                             {event.description}
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </div>
                 </ScrollArea>
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Sidebar */}
-          <div className="space-y-4">
+          {/* Right Column - Participants & Chat */}
+          <div className="space-y-6">
             {/* Participants */}
             <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Participants ({room.participants.length})
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5 text-cyan-400" />
+                  Participants
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">Duelists ({duelists.length})</p>
-                    {duelists.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between py-1">
-                        <span className="text-sm text-foreground flex items-center gap-2">
-                          <Swords className="h-3 w-3 text-primary" />
-                          {p.player.nickname}
-                          {p.player_id === room.created_by && (
-                            <Badge variant="outline" className="text-xs">Host</Badge>
-                          )}
-                        </span>
-                        {room.status === 'active' && (
-                          <span className="text-sm font-mono">{p.life_points}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {spectators.length > 0 && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Spectators ({spectators.length})</p>
-                        {spectators.map((p) => (
-                          <div key={p.id} className="flex items-center gap-2 py-1">
-                            <Eye className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">{p.player.nickname}</span>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Duelists</p>
+                    {duelists.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No duelists yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {duelists.map((p) => (
+                          <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-background border border-border">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm">
+                                {p.player.nickname.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{p.player.nickname}</p>
+                                {p.deck && <p className="text-xs text-muted-foreground">{p.deck.name}</p>}
+                              </div>
+                            </div>
+                            <span className="font-mono text-sm text-cyan-400">{p.life_points} LP</span>
                           </div>
                         ))}
                       </div>
-                    </>
+                    )}
+                  </div>
+                  
+                  {spectators.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Spectators</p>
+                      <div className="flex flex-wrap gap-2">
+                        {spectators.map((p) => (
+                          <Badge key={p.id} variant="secondary" className="flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            {p.player.nickname}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -1011,33 +1194,36 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
             {/* Chat */}
             <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Chat</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Send className="h-5 w-5 text-cyan-400" />
+                  Chat
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-64 mb-3">
-                  {messages.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">No messages yet</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {messages.map((msg) => (
+                <ScrollArea className="h-48 mb-3">
+                  <div className="space-y-2">
+                    {messages.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No messages yet</p>
+                    ) : (
+                      messages.map((msg) => (
                         <div key={msg.id} className="text-sm">
-                          <span className="font-medium text-primary">{msg.player.nickname}: </span>
+                          <span className="font-medium text-cyan-400">{msg.player.nickname}: </span>
                           <span className="text-foreground">{msg.message}</span>
                         </div>
-                      ))}
-                      <div ref={chatEndRef} />
-                    </div>
-                  )}
+                      ))
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
                 </ScrollArea>
                 {selectedPlayer && isParticipant && (
                   <div className="flex gap-2">
                     <Input
+                      placeholder="Type a message..."
                       value={chatMessage}
                       onChange={(e) => setChatMessage(e.target.value)}
-                      placeholder="Type a message..."
-                      className="bg-input border-border"
                       onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      className="bg-input border-border"
                     />
                     <Button size="icon" onClick={handleSendMessage}>
                       <Send className="h-4 w-4" />
@@ -1049,6 +1235,24 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
           </div>
         </div>
       </main>
+
+      {/* Add custom animation styles */}
+      <style jsx global>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0) translateX(0); opacity: 0.4; }
+          50% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-float {
+          animation: float 5s ease-in-out infinite;
+        }
+        .animate-shimmer {
+          animation: shimmer 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   )
 }
