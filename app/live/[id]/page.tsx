@@ -368,8 +368,8 @@ function SpectatorScreen({
         ))}
       </div>
       
-      {/* Turn and Phase Info - Top Center - DSoD Style */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10">
+      {/* Turn and Phase Info - Top Left - DSoD Style */}
+      <div className="absolute top-4 left-4 flex flex-col items-start gap-2 z-10">
         <div className="bg-slate-900/80 backdrop-blur-md px-6 py-2 rounded-lg border border-cyan-500/50 shadow-lg shadow-cyan-500/20">
           <span className="text-cyan-400 font-bold text-lg tracking-wider" style={{ fontFamily: 'var(--font-orbitron)' }}>
             TURN {room.turn_count}
