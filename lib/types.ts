@@ -109,3 +109,58 @@ export interface BanProposalWithVotes extends BanProposal {
   votes: (ProposalVote & { player: Player })[]
   proposer: Player | null
 }
+
+export type DuelRoomStatus = 'waiting' | 'active' | 'finished'
+export type TurnPhase = 'draw' | 'standby' | 'main' | 'battle' | 'end'
+
+export interface DuelRoom {
+  id: string
+  room_code: string
+  name: string
+  status: DuelRoomStatus
+  match_type: MatchType
+  stream_url: string | null
+  created_by: string | null
+  winner_id: string | null
+  turn_count: number
+  current_turn_player_id: string | null
+  turn_phase: TurnPhase
+  created_at: string
+  started_at: string | null
+  ended_at: string | null
+}
+
+export interface DuelRoomParticipant {
+  id: string
+  room_id: string
+  player_id: string
+  deck_id: string | null
+  life_points: number
+  team_number: number | null
+  is_spectator: boolean
+  joined_at: string
+}
+
+export interface DuelRoomEvent {
+  id: string
+  room_id: string
+  player_id: string | null
+  event_type: 'life_change' | 'turn_change' | 'phase_change' | 'game_start' | 'game_end' | 'custom'
+  description: string
+  old_value: string | null
+  new_value: string | null
+  created_at: string
+}
+
+export interface DuelRoomMessage {
+  id: string
+  room_id: string
+  player_id: string
+  message: string
+  created_at: string
+}
+
+export interface DuelRoomWithParticipants extends DuelRoom {
+  participants: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
+  creator: Player | null
+}

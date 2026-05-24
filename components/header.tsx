@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Plus, Swords, Users, Ban } from 'lucide-react'
+import { Plus, Swords, Users, Ban, Radio } from 'lucide-react'
 
 export function Header() {
   return (
@@ -40,6 +40,12 @@ export function Header() {
             <Link href="/banlist" className="flex items-center gap-2">
               <Ban className="h-4 w-4" />
               <span className="hidden sm:inline">Banlist</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/live" className="flex items-center gap-2">
+              <Radio className="h-4 w-4" />
+              <span className="hidden sm:inline">Live</span>
             </Link>
           </Button>
           <Button size="sm" asChild className="bg-primary hover:bg-primary/80 kaiba-glow">
