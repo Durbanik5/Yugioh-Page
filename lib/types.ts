@@ -139,6 +139,9 @@ export interface DuelRoomParticipant {
   team_number: number | null
   is_spectator: boolean
   joined_at: string
+  hand_count: number
+  monster_zones: string
+  spell_trap_zones: string
 }
 
 export interface DuelRoomEvent {

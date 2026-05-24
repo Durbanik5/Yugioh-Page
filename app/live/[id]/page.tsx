@@ -18,7 +18,7 @@ import {
   Radio, ArrowLeft, Users, Eye, Swords, Clock, Copy, 
   Play, Square, Plus, Minus, ChevronRight, Send, Trophy,
   SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X,
-  Maximize2, Monitor
+  Maximize2, Monitor, Hand, Layers
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase } from '@/lib/types'
@@ -28,7 +28,7 @@ interface RoomData extends DuelRoom {
   creator: Player | null
 }
 
-// Dark Side of Dimensions Style LP Display Component
+// Dark Side of Dimensions Style LP Display Component with Field Zones
 function DSoDLifePointDisplay({ 
   participant, 
   isCurrentTurn,
@@ -45,6 +45,11 @@ function DSoDLifePointDisplay({
   const filledSegments = Math.ceil((participant.life_points / 8000) * segments)
   const isLowLp = participant.life_points <= 2000
   const isCriticalLp = participant.life_points <= 1000
+
+  // Parse field zone data
+  const monsterZones = JSON.parse(participant.monster_zones || '[]') as string[]
+  const spellTrapZones = JSON.parse(participant.spell_trap_zones || '[]') as string[]
+  const handCount = participant.hand_count || 0
 
   // Calculate position for circular layout (FFA)
   const style = position ? {
@@ -64,7 +69,7 @@ function DSoDLifePointDisplay({
       style={style}
     >
       {/* DSoD Name Plate - Blue translucent panel */}
-      <div className={`relative mb-1 ${!isCompact ? 'min-w-[240px]' : 'max-w-[160px]'}`}>
+      <div className={`relative mb-1 ${!isCompact ? 'min-w-[280px]' : 'max-w-[180px]'}`}>
         <div className={`
           relative overflow-hidden rounded-md border backdrop-blur-sm
           ${isCurrentTurn 
@@ -75,30 +80,40 @@ function DSoDLifePointDisplay({
           {/* Holographic shine effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-200%] animate-[shimmer_3s_infinite]" />
           
-          <div className="flex items-center gap-2">
-            {/* Player Avatar Circle */}
-            <div className={`
-              rounded-full flex items-center justify-center font-bold text-white flex-shrink-0
-              ${isCurrentTurn 
-                ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 shadow-lg shadow-cyan-500/30' 
-                : 'bg-gradient-to-br from-slate-500 to-slate-700'}
-              ${isCompact ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'}
-            `}>
-              {participant.player.nickname.charAt(0).toUpperCase()}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {/* Player Avatar Circle */}
+              <div className={`
+                rounded-full flex items-center justify-center font-bold text-white flex-shrink-0
+                ${isCurrentTurn 
+                  ? 'bg-gradient-to-br from-cyan-400 to-cyan-600 shadow-lg shadow-cyan-500/30' 
+                  : 'bg-gradient-to-br from-slate-500 to-slate-700'}
+                ${isCompact ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'}
+              `}>
+                {participant.player.nickname.charAt(0).toUpperCase()}
+              </div>
+              
+              <div className="flex flex-col min-w-0">
+                <span 
+                  className={`font-bold uppercase tracking-wide text-white truncate ${isCompact ? 'text-xs' : 'text-sm'}`}
+                  style={{ fontFamily: 'var(--font-orbitron)' }}
+                >
+                  {participant.player.nickname}
+                </span>
+                {participant.deck && (
+                  <span className={`text-cyan-300/70 truncate ${isCompact ? 'text-[9px] max-w-[80px]' : 'text-[10px] max-w-[140px]'}`}>
+                    {participant.deck.name}
+                  </span>
+                )}
+              </div>
             </div>
             
-            <div className="flex flex-col min-w-0">
-              <span 
-                className={`font-bold uppercase tracking-wide text-white truncate ${isCompact ? 'text-xs' : 'text-sm'}`}
-                style={{ fontFamily: 'var(--font-orbitron)' }}
-              >
-                {participant.player.nickname}
+            {/* Hand Count Display */}
+            <div className="flex items-center gap-1 bg-slate-800/80 rounded px-2 py-0.5 border border-slate-600/50">
+              <Hand className={`${isCompact ? 'h-3 w-3' : 'h-4 w-4'} text-amber-400`} />
+              <span className={`font-bold text-amber-400 ${isCompact ? 'text-xs' : 'text-sm'}`}>
+                {handCount}
               </span>
-              {participant.deck && (
-                <span className={`text-cyan-300/70 truncate ${isCompact ? 'text-[9px] max-w-[80px]' : 'text-[10px] max-w-[160px]'}`}>
-                  {participant.deck.name}
-                </span>
-              )}
             </div>
           </div>
           
@@ -111,7 +126,7 @@ function DSoDLifePointDisplay({
       </div>
 
       {/* DSoD Life Point Display - Main Panel */}
-      <div className={`relative ${!isCompact ? 'min-w-[240px]' : 'max-w-[160px]'}`}>
+      <div className={`relative ${!isCompact ? 'min-w-[280px]' : 'max-w-[180px]'}`}>
         {/* Outer glow for critical LP */}
         {isCriticalLp && (
           <div className="absolute -inset-2 bg-red-500/30 rounded-lg blur-xl animate-pulse" />
@@ -187,6 +202,67 @@ function DSoDLifePointDisplay({
             }}
           >
             {participant.life_points.toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* Yu-Gi-Oh Field Display - Traditional Layout */}
+      <div className={`mt-2 ${!isCompact ? 'min-w-[280px]' : 'max-w-[180px]'}`}>
+        <div className="bg-slate-900/80 backdrop-blur-sm rounded-lg border border-slate-700/50 p-2">
+          {/* Monster Zones - 5 slots */}
+          <div className="flex justify-center gap-1 mb-1">
+            {[0, 1, 2, 3, 4].map((index) => {
+              const hasCard = monsterZones[index] && monsterZones[index] !== ''
+              return (
+                <div
+                  key={`monster-${index}`}
+                  className={`
+                    ${isCompact ? 'w-5 h-6' : 'w-8 h-10'} rounded border-2 transition-all
+                    ${hasCard 
+                      ? 'bg-amber-900/60 border-amber-500/60 shadow-[0_0_6px_rgba(217,119,6,0.4)]' 
+                      : 'bg-slate-800/40 border-slate-600/30'}
+                  `}
+                  title={hasCard ? monsterZones[index] : `Monster Zone ${index + 1}`}
+                >
+                  {hasCard && (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Sparkles className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-amber-400`} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          
+          {/* Spell/Trap Zones - 5 slots */}
+          <div className="flex justify-center gap-1">
+            {[0, 1, 2, 3, 4].map((index) => {
+              const hasCard = spellTrapZones[index] && spellTrapZones[index] !== ''
+              return (
+                <div
+                  key={`spelltrap-${index}`}
+                  className={`
+                    ${isCompact ? 'w-5 h-6' : 'w-8 h-10'} rounded border-2 transition-all
+                    ${hasCard 
+                      ? 'bg-cyan-900/60 border-cyan-500/60 shadow-[0_0_6px_rgba(6,182,212,0.4)]' 
+                      : 'bg-slate-800/40 border-slate-600/30'}
+                  `}
+                  title={hasCard ? spellTrapZones[index] : `Spell/Trap Zone ${index + 1}`}
+                >
+                  {hasCard && (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Shield className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-cyan-400`} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          
+          {/* Zone labels */}
+          <div className="flex justify-between mt-1 px-1">
+            <span className={`text-amber-400/70 ${isCompact ? 'text-[6px]' : 'text-[8px]'}`}>M: {monsterZones.filter(z => z && z !== '').length}/5</span>
+            <span className={`text-cyan-400/70 ${isCompact ? 'text-[6px]' : 'text-[8px]'}`}>S/T: {spellTrapZones.filter(z => z && z !== '').length}/5</span>
           </div>
         </div>
       </div>
@@ -773,6 +849,44 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     router.push('/live')
   }
 
+  const handleHandCountChange = async (participantId: string, playerId: string, currentCount: number, change: number) => {
+    const newCount = Math.max(0, currentCount + change)
+    
+    await supabase
+      .from('duel_room_participants')
+      .update({ hand_count: newCount })
+      .eq('id', participantId)
+
+    const player = duelists.find(d => d.player_id === playerId)?.player
+    await supabase.from('duel_room_events').insert({
+      room_id: id,
+      player_id: playerId,
+      event_type: 'custom',
+      description: `${player?.nickname || 'Player'} hand: ${currentCount} → ${newCount}`,
+    })
+  }
+
+  const handleFieldZoneChange = async (participantId: string, playerId: string, zoneType: 'monster' | 'spelltrap', zoneIndex: number, hasCard: boolean) => {
+    const participant = duelists.find(d => d.id === participantId)
+    if (!participant) return
+
+    const zones = zoneType === 'monster' 
+      ? JSON.parse(participant.monster_zones || '[]')
+      : JSON.parse(participant.spell_trap_zones || '[]')
+    
+    // Ensure array has 5 slots
+    while (zones.length < 5) zones.push('')
+    
+    // Toggle the zone
+    zones[zoneIndex] = hasCard ? '' : 'card'
+    
+    const updateField = zoneType === 'monster' ? 'monster_zones' : 'spell_trap_zones'
+    await supabase
+      .from('duel_room_participants')
+      .update({ [updateField]: JSON.stringify(zones) })
+      .eq('id', participantId)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -1034,46 +1148,128 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                   </div>
 
                   {/* Per-Duelist Controls */}
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {duelists.map((participant) => (
-                      <div key={participant.id} className="p-3 rounded-lg bg-background border border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm">{participant.player.nickname}</span>
-                          <span className="font-mono text-cyan-400">{participant.life_points} LP</span>
+                  <div className="grid gap-3">
+                    {duelists.map((participant) => {
+                      const monsterZones = JSON.parse(participant.monster_zones || '[]')
+                      const spellTrapZones = JSON.parse(participant.spell_trap_zones || '[]')
+                      
+                      return (
+                        <div key={participant.id} className="p-3 rounded-lg bg-background border border-border">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">{participant.player.nickname}</span>
+                            <span className="font-mono text-cyan-400">{participant.life_points} LP</span>
+                          </div>
+                          
+                          {/* LP Controls */}
+                          <div className="flex gap-2 mb-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-red-400 border-red-400/50 hover:bg-red-400/10"
+                              onClick={() => handleLifePointChange(participant.id, participant.player_id, participant.life_points, -lpChangeAmount)}
+                            >
+                              <Minus className="h-4 w-4 mr-1" />
+                              {lpChangeAmount}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-green-400 border-green-400/50 hover:bg-green-400/10"
+                              onClick={() => handleLifePointChange(participant.id, participant.player_id, participant.life_points, lpChangeAmount)}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              {lpChangeAmount}
+                            </Button>
+                          </div>
+
+                          {/* Hand Count Control */}
+                          <div className="flex items-center justify-between mb-3 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                            <div className="flex items-center gap-2">
+                              <Hand className="h-4 w-4 text-amber-400" />
+                              <span className="text-sm text-amber-400">Hand</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-amber-400 hover:bg-amber-400/20"
+                                onClick={() => handleHandCountChange(participant.id, participant.player_id, participant.hand_count || 0, -1)}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="font-mono text-amber-400 w-6 text-center">{participant.hand_count || 0}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-amber-400 hover:bg-amber-400/20"
+                                onClick={() => handleHandCountChange(participant.id, participant.player_id, participant.hand_count || 0, 1)}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Field Zones Control */}
+                          <div className="space-y-2">
+                            {/* Monster Zones */}
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                              <span className="text-[10px] text-muted-foreground w-8">MON</span>
+                              <div className="flex gap-1">
+                                {[0, 1, 2, 3, 4].map((i) => {
+                                  const hasCard = monsterZones[i] && monsterZones[i] !== ''
+                                  return (
+                                    <button
+                                      key={i}
+                                      onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'monster', i, hasCard)}
+                                      className={`w-6 h-7 rounded border-2 transition-all ${
+                                        hasCard 
+                                          ? 'bg-amber-600/60 border-amber-500 shadow-[0_0_4px_rgba(217,119,6,0.5)]' 
+                                          : 'bg-slate-800/40 border-slate-600/50 hover:border-amber-500/50'
+                                      }`}
+                                    />
+                                  )
+                                })}
+                              </div>
+                            </div>
+                            
+                            {/* Spell/Trap Zones */}
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-3 w-3 text-cyan-400 flex-shrink-0" />
+                              <span className="text-[10px] text-muted-foreground w-8">S/T</span>
+                              <div className="flex gap-1">
+                                {[0, 1, 2, 3, 4].map((i) => {
+                                  const hasCard = spellTrapZones[i] && spellTrapZones[i] !== ''
+                                  return (
+                                    <button
+                                      key={i}
+                                      onClick={() => handleFieldZoneChange(participant.id, participant.player_id, 'spelltrap', i, hasCard)}
+                                      className={`w-6 h-7 rounded border-2 transition-all ${
+                                        hasCard 
+                                          ? 'bg-cyan-600/60 border-cyan-500 shadow-[0_0_4px_rgba(6,182,212,0.5)]' 
+                                          : 'bg-slate-800/40 border-slate-600/50 hover:border-cyan-500/50'
+                                      }`}
+                                    />
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          {isHost && room.status === 'active' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-3 text-yellow-400 hover:bg-yellow-400/10"
+                              onClick={() => handleEndDuel(participant.player_id)}
+                            >
+                              <Trophy className="h-4 w-4 mr-1" />
+                              Declare Winner
+                            </Button>
+                          )}
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 text-red-400 border-red-400/50 hover:bg-red-400/10"
-                            onClick={() => handleLifePointChange(participant.id, participant.player_id, participant.life_points, -lpChangeAmount)}
-                          >
-                            <Minus className="h-4 w-4 mr-1" />
-                            {lpChangeAmount}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 text-green-400 border-green-400/50 hover:bg-green-400/10"
-                            onClick={() => handleLifePointChange(participant.id, participant.player_id, participant.life_points, lpChangeAmount)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            {lpChangeAmount}
-                          </Button>
-                        </div>
-                        {isHost && room.status === 'active' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="w-full mt-2 text-yellow-400 hover:bg-yellow-400/10"
-                            onClick={() => handleEndDuel(participant.player_id)}
-                          >
-                            <Trophy className="h-4 w-4 mr-1" />
-                            Declare Winner
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
