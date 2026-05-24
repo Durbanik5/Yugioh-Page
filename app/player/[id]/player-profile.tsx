@@ -30,19 +30,21 @@ import { toast } from 'sonner'
 import { 
   Trophy, Target, Percent, Swords, Users, 
   ChevronLeft, Trash2, Plus, Layers, Medal,
-  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award
+  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award, Bookmark
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
+import { MatchCard } from '@/components/match-card'
 import { PlayerCollection } from '@/components/player-collection'
-import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat } from '@/lib/types'
+import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch } from '@/lib/types'
 
 interface PlayerProfileProps {
   player: PlayerWithStats
   matches: MatchWithParticipants[]
   allPlayers: Player[]
+  savedMatches: SavedMatch[]
 }
 
 // Helper to get ordinal suffix
@@ -236,7 +238,7 @@ function calculateTagTeamRecords(matches: MatchWithParticipants[], playerId: str
   return Object.values(records).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses))
 }
 
-export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProps) {
+export function PlayerProfile({ player, matches, allPlayers, savedMatches }: PlayerProfileProps) {
   const [deleting, setDeleting] = useState(false)
   const [formatFilter, setFormatFilter] = useState<DeckFormat | 'all'>('all')
   const router = useRouter()
@@ -256,6 +258,21 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
     if (formatFilter === 'all') return player.decks
     return player.decks.filter(deck => (deck.format || 'casual') === formatFilter)
   }, [player.decks, formatFilter])
+
+  // Get showcase matches (saved with showcase flag)
+  const showcaseMatches = useMemo(() => {
+    const showcaseIds = savedMatches.filter(sm => sm.showcase).map(sm => sm.match_id)
+    return matches.filter(m => showcaseIds.includes(m.id))
+  }, [matches, savedMatches])
+
+  // Get saved match data for a specific match
+  const getSavedMatch = (matchId: string): SavedMatch | null => {
+    return savedMatches.find(sm => sm.match_id === matchId) || null
+  }
+
+  const handleSaveChange = () => {
+    router.refresh()
+  }
 
   // Calculate achievements
   const achievements = useMemo(() => {
@@ -389,30 +406,9 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
       toast.error('Failed to delete player')
     } finally {
       setDeleting(false)
-    }
   }
-
-  const getMatchTypeIcon = (type: string) => {
-    switch (type) {
-      case '1v1': return <Swords className="h-4 w-4" />
-      case 'free_for_all': return <Users className="h-4 w-4" />
-      case 'tag_team': return <Layers className="h-4 w-4" />
-      default: return <Swords className="h-4 w-4" />
-    }
   }
-
-  const getMatchTypeLabel = (type: string) => {
-    switch (type) {
-      case '1v1': return '1v1'
-      case 'free_for_all': return 'FFA'
-      case 'tag_team': return 'Tag'
-      default: return type
-    }
-  }
-
-  // Get recent matches for display (limit to 10)
-  const recentMatches = matches.slice(0, 10)
-
+  
   return (
     <main className="container mx-auto px-4 py-8">
       {/* Back Button */}
@@ -551,7 +547,10 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
         <TabsList className="bg-secondary border border-border">
           <TabsTrigger value="stats">Statistics</TabsTrigger>
           <TabsTrigger value="decks">Decks ({player.decks.length})</TabsTrigger>
-          <TabsTrigger value="matches">Recent Matches</TabsTrigger>
+          <TabsTrigger value="matches">Match History</TabsTrigger>
+          <TabsTrigger value="saved">
+            Saved {savedMatches.length > 0 && `(${savedMatches.length})`}
+          </TabsTrigger>
           <TabsTrigger value="collection">Collection</TabsTrigger>
         </TabsList>
 
@@ -921,7 +920,36 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
 
         {/* Matches Tab */}
         <TabsContent value="matches" className="space-y-4">
-          {recentMatches.length === 0 ? (
+          {/* Showcase Section */}
+          {showcaseMatches.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Star className="h-4 w-4 text-yellow-500" />
+                <h3 className="font-semibold text-foreground">Featured Matches</h3>
+              </div>
+              <div className="space-y-3">
+                {showcaseMatches.map((match) => (
+                  <MatchCard
+                    key={`showcase-${match.id}`}
+                    match={match}
+                    currentPlayerId={player.id}
+                    savedMatch={getSavedMatch(match.id)}
+                    onSaveChange={handleSaveChange}
+                    showSaveButton={true}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* All Matches */}
+          <div className="flex items-center gap-2 mb-3">
+            <Swords className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-foreground">Match History</h3>
+            <Badge variant="outline" className="text-xs">{matches.length} total</Badge>
+          </div>
+          
+          {matches.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
                 <p className="text-muted-foreground">No matches recorded yet.</p>
@@ -935,55 +963,51 @@ export function PlayerProfile({ player, matches, allPlayers }: PlayerProfileProp
             </Card>
           ) : (
             <div className="space-y-3">
-              {recentMatches.map((match) => {
-                const playerParticipant = match.participants.find(p => p.player_id === player.id)
-                const isWinner = playerParticipant?.is_winner ?? false
-                const placement = playerParticipant?.placement
-                
+              {matches.map((match) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  currentPlayerId={player.id}
+                  savedMatch={getSavedMatch(match.id)}
+                  onSaveChange={handleSaveChange}
+                  showSaveButton={true}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Saved Matches Tab */}
+        <TabsContent value="saved" className="space-y-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bookmark className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-foreground">Saved Matches</h3>
+          </div>
+          
+          {savedMatches.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="py-12 text-center">
+                <Bookmark className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No saved matches yet.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Save matches from your match history to find them easily later.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {savedMatches.map((savedMatch) => {
+                const match = matches.find(m => m.id === savedMatch.match_id)
+                if (!match) return null
                 return (
-                  <Card key={match.id} className={`bg-card border-border ${isWinner ? 'border-l-2 border-l-green-500' : 'border-l-2 border-l-red-500'}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            {getMatchTypeIcon(match.match_type)}
-                            {getMatchTypeLabel(match.match_type)}
-                          </Badge>
-                          {match.match_type === 'free_for_all' && placement ? (
-                            <Badge 
-                              variant={placement === 1 ? 'default' : 'secondary'} 
-                              className={
-                                placement === 1 ? 'bg-yellow-500 text-yellow-950' :
-                                placement === 2 ? 'bg-gray-400 text-gray-950' :
-                                placement === 3 ? 'bg-amber-700 text-amber-50' : ''
-                              }
-                            >
-                              {getOrdinal(placement)} Place
-                            </Badge>
-                          ) : (
-                            <Badge variant={isWinner ? 'default' : 'secondary'} className={isWinner ? 'bg-green-600' : 'bg-red-600'}>
-                              {isWinner ? 'Victory' : 'Defeat'}
-                            </Badge>
-                          )}
-                        </div>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(match.played_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="mt-3 text-sm text-muted-foreground">
-                        <span>vs </span>
-                        {match.participants
-                          .filter(p => p.player_id !== player.id)
-                          .map(p => p.player?.nickname || 'Unknown')
-                          .join(', ') || 'Unknown'}
-                      </div>
-                      {playerParticipant?.deck && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Deck: {playerParticipant.deck.name}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <MatchCard
+                    key={savedMatch.id}
+                    match={match}
+                    currentPlayerId={player.id}
+                    savedMatch={savedMatch}
+                    onSaveChange={handleSaveChange}
+                    showSaveButton={true}
+                  />
                 )
               })}
             </div>

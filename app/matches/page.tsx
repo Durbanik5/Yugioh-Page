@@ -1,12 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/header'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Empty } from '@/components/ui/empty'
 import { Button } from '@/components/ui/button'
-import { Swords, Users, Layers, Plus, Trophy } from 'lucide-react'
+import { Swords, Plus } from 'lucide-react'
 import Link from 'next/link'
-import type { MatchWithParticipants } from '@/lib/types'
+import type { MatchWithParticipants, Player, SavedMatch } from '@/lib/types'
+import { MatchesClient } from './matches-client'
 
 export const revalidate = 0
 
@@ -24,7 +23,7 @@ async function getMatches(): Promise<MatchWithParticipants[]> {
       )
     `)
     .order('played_at', { ascending: false })
-    .limit(50)
+    .limit(100)
 
   if (error) {
     console.error('Error fetching matches:', error)
@@ -34,26 +33,43 @@ async function getMatches(): Promise<MatchWithParticipants[]> {
   return (matches || []) as MatchWithParticipants[]
 }
 
-function getMatchTypeIcon(type: string) {
-  switch (type) {
-    case '1v1': return <Swords className="h-4 w-4" />
-    case 'free_for_all': return <Users className="h-4 w-4" />
-    case 'tag_team': return <Layers className="h-4 w-4" />
-    default: return <Swords className="h-4 w-4" />
+async function getPlayers(): Promise<Player[]> {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('players')
+    .select('*')
+    .order('nickname')
+
+  if (error) {
+    console.error('Error fetching players:', error)
+    return []
   }
+
+  return data || []
 }
 
-function getMatchTypeLabel(type: string) {
-  switch (type) {
-    case '1v1': return '1v1 Duel'
-    case 'free_for_all': return 'Free-For-All'
-    case 'tag_team': return 'Tag Team'
-    default: return type
+async function getSavedMatches(): Promise<SavedMatch[]> {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('saved_matches')
+    .select('*')
+
+  if (error) {
+    console.error('Error fetching saved matches:', error)
+    return []
   }
+
+  return data || []
 }
 
 export default async function MatchesPage() {
-  const matches = await getMatches()
+  const [matches, players, savedMatches] = await Promise.all([
+    getMatches(),
+    getPlayers(),
+    getSavedMatches()
+  ])
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,94 +104,11 @@ export default async function MatchesPage() {
             className="py-16"
           />
         ) : (
-          <div className="space-y-4">
-            {matches.map((match) => {
-              const winners = match.participants.filter(p => p.is_winner)
-              const losers = match.participants.filter(p => !p.is_winner)
-              
-              return (
-                <Card key={match.id} className="bg-card border-border hover:border-primary/30 transition-colors">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="flex items-center gap-1.5 border-primary/50">
-                          {getMatchTypeIcon(match.match_type)}
-                          {getMatchTypeLabel(match.match_type)}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(match.played_at).toLocaleDateString(undefined, {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      {/* Winners */}
-                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
-                        <div className="flex items-center gap-2 text-green-400 text-sm mb-2">
-                          <Trophy className="h-4 w-4" />
-                          <span className="font-medium">
-                            {match.match_type === 'tag_team' ? 'Winning Team' : 'Winner'}
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          {winners.map((p) => (
-                            <Link 
-                              key={p.id} 
-                              href={`/player/${p.player_id}`}
-                              className="block hover:text-primary transition-colors"
-                            >
-                              <span className="font-medium">{p.player.nickname}</span>
-                              {p.deck && (
-                                <span className="text-muted-foreground text-sm ml-2">
-                                  ({p.deck.name})
-                                </span>
-                              )}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Losers */}
-                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                        <div className="flex items-center gap-2 text-red-400 text-sm mb-2">
-                          <span className="font-medium">
-                            {match.match_type === 'tag_team' ? 'Losing Team' : 'Defeated'}
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          {losers.map((p) => (
-                            <Link 
-                              key={p.id} 
-                              href={`/player/${p.player_id}`}
-                              className="block hover:text-primary transition-colors"
-                            >
-                              <span className="font-medium">{p.player.nickname}</span>
-                              {p.deck && (
-                                <span className="text-muted-foreground text-sm ml-2">
-                                  ({p.deck.name})
-                                </span>
-                              )}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {match.notes && (
-                      <p className="mt-3 text-sm text-muted-foreground italic">
-                        {match.notes}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+          <MatchesClient 
+            matches={matches} 
+            players={players}
+            savedMatches={savedMatches}
+          />
         )}
       </main>
     </div>

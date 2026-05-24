@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/header'
 import { PlayerProfile } from './player-profile'
-import type { PlayerWithStats, MatchWithParticipants, Player } from '@/lib/types'
+import type { PlayerWithStats, MatchWithParticipants, Player, SavedMatch } from '@/lib/types'
 
 export const revalidate = 0
 
@@ -95,6 +95,23 @@ async function getAllPlayers() {
   return data || []
 }
 
+async function getSavedMatches(playerId: string): Promise<SavedMatch[]> {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('saved_matches')
+    .select('*')
+    .eq('player_id', playerId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching saved matches:', error)
+    return []
+  }
+
+  return data || []
+}
+
 export default async function PlayerPage({ params }: PlayerPageProps) {
   const { id } = await params
   const player = await getPlayer(id)
@@ -103,13 +120,21 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     notFound()
   }
 
-  const matches = await getPlayerMatches(id)
-  const allPlayers = await getAllPlayers()
+  const [matches, allPlayers, savedMatches] = await Promise.all([
+    getPlayerMatches(id),
+    getAllPlayers(),
+    getSavedMatches(id)
+  ])
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <PlayerProfile player={player} matches={matches} allPlayers={allPlayers} />
+      <PlayerProfile 
+        player={player} 
+        matches={matches} 
+        allPlayers={allPlayers}
+        savedMatches={savedMatches}
+      />
     </div>
   )
 }

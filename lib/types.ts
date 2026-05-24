@@ -203,3 +203,16 @@ export interface CollectionCard {
   notes: string | null
   added_at: string
 }
+
+export interface SavedMatch {
+  id: string
+  player_id: string
+  match_id: string
+  note: string | null
+  showcase: boolean
+  created_at: string
+}
+
+export interface SavedMatchWithDetails extends SavedMatch {
+  match: MatchWithParticipants
+}
