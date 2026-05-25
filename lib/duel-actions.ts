@@ -97,6 +97,7 @@ export async function initializeDuelDeck(
         defense: cardDetails?.def ?? null,
         level: cardDetails?.level ?? null,
         attribute: cardDetails?.attribute ?? null,
+        effect_text: cardDetails?.desc ?? null,
         deck_category: card.deck_category
       })
     }
@@ -140,6 +141,7 @@ export async function initializeDuelDeck(
       defense: card.defense,
       level: card.level,
       attribute: card.attribute,
+      effect_text: card.effect_text,
       order_index: index,
     })),
     ...extraDeckCards.map((card, index) => ({
@@ -155,6 +157,7 @@ export async function initializeDuelDeck(
       defense: card.defense,
       level: card.level,
       attribute: card.attribute,
+      effect_text: card.effect_text,
       order_index: index,
     })),
   ]

@@ -33,7 +33,7 @@ interface DeckSearchModalProps {
 export function DeckSearchModal({
   open,
   onClose,
-  cards,
+  cards = [],
   title = 'Search Deck',
   description = 'Select a card from your deck',
   onSelectCard,
@@ -46,6 +46,7 @@ export function DeckSearchModal({
   const [filter, setFilter] = useState<'all' | 'monster' | 'spell' | 'trap'>('all')
 
   const filteredCards = useMemo(() => {
+    if (!cards) return []
     let filtered = cards
 
     // Apply type filter

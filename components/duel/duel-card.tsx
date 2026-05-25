@@ -31,6 +31,7 @@ interface DuelCardProps {
   onBanish?: (faceDown?: boolean) => void
   onAddCounter?: () => void
   onRemoveCounter?: () => void
+  onHover?: (card: DuelGameCard | null) => void
   disabled?: boolean
   selected?: boolean
   showActions?: boolean
@@ -58,6 +59,7 @@ export function DuelCard({
   onBanish,
   onAddCounter,
   onRemoveCounter,
+  onHover,
   disabled = false,
   selected = false,
   showActions = true,
@@ -105,6 +107,8 @@ export function DuelCard({
         !disabled && 'hover:scale-105 hover:z-10',
         className
       )}
+      onMouseEnter={() => onHover?.(card)}
+      onMouseLeave={() => onHover?.(null)}
     >
       <Image
         src={imageUrl}

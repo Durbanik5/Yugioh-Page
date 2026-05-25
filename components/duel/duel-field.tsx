@@ -2,6 +2,9 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { DuelCard, EmptyZone } from './duel-card'
+import { CardInfoPanel } from './card-info-panel'
+import { DeckSearchModal } from './deck-search-modal'
+import { ChainPrompt } from './chain-prompt'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -13,7 +16,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { 
-  Layers, Flame, Ban, RotateCcw, Eye, Shuffle, Sparkles, Heart
+  Layers, Flame, Ban, RotateCcw, Eye, Shuffle, Sparkles, Heart, Search, Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -67,6 +70,14 @@ export function DuelField({
   const [graveyardOpen, setGraveyardOpen] = useState<'mine' | 'opponent' | null>(null)
   const [banishedOpen, setBanishedOpen] = useState<'mine' | 'opponent' | null>(null)
   const [extraDeckOpen, setExtraDeckOpen] = useState(false)
+  
+  // New state for card info, deck search, and chain system
+  const [hoveredCard, setHoveredCard] = useState<DuelGameCard | null>(null)
+  const [deckSearchOpen, setDeckSearchOpen] = useState(false)
+  const [chainPrompt, setChainPrompt] = useState<{
+    activatingCard: DuelGameCard
+    activatingPlayerId: string
+  } | null>(null)
 
   // Organize cards by location and player
   const organizedCards = useMemo(() => {
@@ -220,6 +231,74 @@ export function DuelField({
       toast.error(result.error || 'Failed to shuffle')
     }
   }, [room.id, myPlayerId, onCardsChanged])
+
+  // Handle deck search - add selected card to hand
+  const handleDeckSearch = useCallback(async (card: DuelGameCard) => {
+    // Move card from deck to hand
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('duel_game_cards')
+      .update({ location: 'hand' })
+      .eq('id', card.id)
+    
+    if (error) {
+      toast.error('Failed to add card to hand')
+    } else {
+      toast.success(`Added ${card.card_name} to hand`)
+      setDeckSearchOpen(false)
+      onCardsChanged()
+      // After searching, shuffle the deck
+      await shuffleDeck(room.id, myPlayerId)
+    }
+  }, [room.id, myPlayerId, onCardsChanged])
+
+  // Handle special summon from various locations
+  const handleSpecialSummon = useCallback(async (card: DuelGameCard, position: CardPosition) => {
+    // Find an empty monster zone
+    const myMonsters = allCards.filter(c => c.player_id === myPlayerId && c.location === 'monster_zone')
+    const occupiedZones = myMonsters.map(c => c.zone_index)
+    let emptyZone = -1
+    for (let i = 0; i < 5; i++) {
+      if (!occupiedZones.includes(i)) {
+        emptyZone = i
+        break
+      }
+    }
+    
+    if (emptyZone === -1) {
+      toast.error('No empty monster zones')
+      return
+    }
+
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    
+    const { error } = await supabase
+      .from('duel_game_cards')
+      .update({ 
+        location: 'monster_zone',
+        zone_index: emptyZone,
+        position 
+      })
+      .eq('id', card.id)
+    
+    if (error) {
+      toast.error('Failed to special summon')
+    } else {
+      toast.success(`Special Summoned ${card.card_name}!`)
+      onCardsChanged()
+    }
+  }, [allCards, myPlayerId, onCardsChanged])
+
+  // Handle chain response
+  const handleChainResponse = useCallback((response: 'chain' | 'pass') => {
+    if (response === 'chain') {
+      toast.info('Chain building not yet implemented - resolve effects manually')
+    }
+    setChainPrompt(null)
+  }, [])
 
   // Card zone dimensions
   const cardWidth = 'w-16'
@@ -547,10 +626,13 @@ export function DuelField({
                 <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-cyan-700/50 hover:bg-cyan-900/30" onClick={handleDraw}>
                   Draw
                 </Button>
-                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={handleShuffleDeck}>
-                  <Shuffle className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setGraveyardOpen('mine')}>
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={handleShuffleDeck}>
+                <Shuffle className="h-3 w-3" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={() => setDeckSearchOpen(true)} title="Search Deck">
+                <Search className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setGraveyardOpen('mine')}>
                   <Flame className="h-3 w-3 mr-0.5 text-orange-400" />{organizedCards.my.graveyard.length}
                 </Button>
                 <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setBanishedOpen('mine')}>
@@ -703,6 +785,40 @@ export function DuelField({
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Deck Search Modal */}
+      <DeckSearchModal
+        open={deckSearchOpen}
+        onClose={() => setDeckSearchOpen(false)}
+        cards={organizedCards.my.deck}
+        onSelectCard={(card, action) => {
+          if (action === 'add_to_hand') {
+            handleDeckSearch(card)
+          } else if (action === 'special_summon') {
+            handleSpecialSummon(card, 'face_up_attack')
+          }
+        }}
+        allowedActions={['add_to_hand', 'special_summon']}
+      />
+
+      {/* Chain Prompt - shows when opponent activates something */}
+      {chainPrompt && (
+        <ChainPrompt
+          activatingCard={chainPrompt.activatingCard}
+          activatingPlayerName={chainPrompt.activatingPlayerId === myPlayerId ? myPlayer.username : (opponentPlayer?.username || 'Opponent')}
+          timeRemaining={30}
+          onResponse={handleChainResponse}
+          availableCards={[
+            ...organizedCards.my.hand.filter(c => c.card_type === 'trap' || c.card_type === 'spell'),
+            ...organizedCards.my.spellZones.filter((c): c is DuelGameCard => c !== null && c.position === 'face_down'),
+          ]}
+        />
+      )}
+
+      {/* Card Info Panel - shows when hovering over cards */}
+      {hoveredCard && (
+        <CardInfoPanel card={hoveredCard} />
+      )}
     </div>
   )
 }
