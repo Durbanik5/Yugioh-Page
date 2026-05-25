@@ -51,15 +51,17 @@ export function EffectActivationModal({
 }: EffectActivationModalProps) {
   const [selectedTargets, setSelectedTargets] = useState<string[]>([])
 
+  // Parse effect text for action keywords - must be called before any early return
+  const { possibleActions, keywords: effectKeywords } = useMemo(() => {
+    if (!card?.effect_text) return { possibleActions: [], keywords: [] }
+    return parseEffectText(card.effect_text)
+  }, [card?.effect_text])
+
+  // Early return after all hooks
   if (!card) return null
 
   // Try to get the card script for scripted effect handling
   const cardScript = card.card_id ? getCardScript(card.card_id) : undefined
-  
-  // Parse effect text for action keywords
-  const { possibleActions, keywords: effectKeywords } = useMemo(() => {
-    return parseEffectText(card.effect_text || '')
-  }, [card.effect_text])
 
   const imageUrl = card.card_id
     ? `https://images.ygoprodeck.com/images/cards/${card.card_id}.jpg`
