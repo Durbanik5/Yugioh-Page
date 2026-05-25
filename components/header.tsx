@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Plus, Swords, Users, Ban, Radio } from 'lucide-react'
+import { Plus, Swords, Users, Ban, Radio, Gamepad2 } from 'lucide-react'
 
 export function Header() {
   return (
@@ -25,6 +25,12 @@ export function Header() {
         
         <nav className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/campaign" className="flex items-center gap-2">
+              <Gamepad2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Campaign</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
             <Link href="/" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Duelists</span>
@@ -45,7 +51,7 @@ export function Header() {
           <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
             <Link href="/live" className="flex items-center gap-2">
               <Radio className="h-4 w-4" />
-              <span className="hidden sm:inline">Live</span>
+              <span className="hidden sm:inline">Duel</span>
             </Link>
           </Button>
           <Button size="sm" asChild className="bg-primary hover:bg-primary/80 kaiba-glow">
