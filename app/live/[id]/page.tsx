@@ -13,12 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { 
   Radio, ArrowLeft, Users, Eye, Swords, Clock, Copy, 
   Play, Square, Plus, Minus, ChevronRight, Send, Trophy,
   SkipForward, Zap, Shield, Sparkles, Target, Heart, LogOut, X,
-  Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw, ArrowLeftRight, UserCheck
+  Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw, ArrowLeftRight, UserCheck, Settings
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase, DuelGameCard } from '@/lib/types'
@@ -388,32 +389,69 @@ function SpectatorScreen({
     return (
       <div className="relative aspect-video bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-xl border-2 border-cyan-500/20 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-          <div className="text-center space-y-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 overflow-y-auto">
+          <div className="text-center space-y-4 w-full max-w-2xl">
             <div className="relative">
-              <Monitor className="h-16 w-16 mx-auto text-cyan-500/50 animate-pulse" />
+              <Monitor className="h-12 w-12 mx-auto text-cyan-500/50 animate-pulse" />
               <div className="absolute inset-0 blur-xl bg-cyan-500/20" />
             </div>
-            <h2 className="text-2xl font-bold text-cyan-400" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            <h2 className="text-xl font-bold text-cyan-400" style={{ fontFamily: 'var(--font-orbitron)' }}>
               WAITING FOR DUELISTS
             </h2>
             <div className="flex items-center justify-center gap-2">
-              <span className="text-muted-foreground">Room Code:</span>
-              <span className="font-mono text-xl text-cyan-400 font-bold tracking-wider">{room.room_code}</span>
+              <span className="text-muted-foreground text-sm">Room Code:</span>
+              <span className="font-mono text-lg text-cyan-400 font-bold tracking-wider">{room.room_code}</span>
+            </div>
+            
+            {/* Current Rules Display */}
+            <div className="bg-slate-900/70 rounded-lg p-3 border border-slate-700 text-left">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-2">Current Rules</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div className="bg-slate-800/50 rounded p-2">
+                  <span className="text-muted-foreground">LP:</span>
+                  <span className="text-foreground ml-1 font-semibold">{room.starting_lp || 8000}</span>
+                </div>
+                <div className="bg-slate-800/50 rounded p-2">
+                  <span className="text-muted-foreground">Hand:</span>
+                  <span className="text-foreground ml-1 font-semibold">{room.starting_hand_size || 5} cards</span>
+                </div>
+                <div className="bg-slate-800/50 rounded p-2">
+                  <span className="text-muted-foreground">Rule:</span>
+                  <span className="text-foreground ml-1 font-semibold">{room.master_rule || 'MR5'}</span>
+                </div>
+                <div className="bg-slate-800/50 rounded p-2">
+                  <span className="text-muted-foreground">Type:</span>
+                  <span className="text-foreground ml-1 font-semibold">{room.match_type || '1v1'}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-2 text-xs">
+                {room.first_turn_draw && (
+                  <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded">1st Turn Draw</span>
+                )}
+                {room.shuffle_deck !== false && (
+                  <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Auto Shuffle</span>
+                )}
+                {room.time_per_turn && (
+                  <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">{room.time_per_turn}s/turn</span>
+                )}
+              </div>
             </div>
             
             {/* Duelists Status */}
-            <div className="flex justify-center gap-8 mt-6">
+            <div className="flex justify-center gap-4 mt-4">
               {[0, 1].map((slot) => {
                 const duelist = duelists[slot]
                 return (
-                  <div key={slot} className="text-center p-4 rounded-lg border border-slate-700 bg-slate-900/50 min-w-[150px]">
+                  <div key={slot} className="text-center p-3 rounded-lg border border-slate-700 bg-slate-900/50 min-w-[130px]">
                     {duelist ? (
                       <>
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 mx-auto mb-2 flex items-center justify-center text-white font-bold text-xl">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 mx-auto mb-2 flex items-center justify-center text-white font-bold text-lg">
                           {duelist.player.nickname.charAt(0).toUpperCase()}
                         </div>
-                        <p className="font-semibold text-foreground">{duelist.player.nickname}</p>
+                        <p className="font-semibold text-foreground text-sm">{duelist.player.nickname}</p>
+                        {duelist.player_id === room.created_by && (
+                          <span className="text-xs text-yellow-400">(Host)</span>
+                        )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {duelist.deck ? (
                             <span className="text-green-400">Deck: {duelist.deck.name}</span>
@@ -424,10 +462,10 @@ function SpectatorScreen({
                       </>
                     ) : (
                       <>
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-600 mx-auto mb-2 flex items-center justify-center">
-                          <span className="text-slate-500 text-2xl">?</span>
+                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-600 mx-auto mb-2 flex items-center justify-center">
+                          <span className="text-slate-500 text-xl">?</span>
                         </div>
-                        <p className="text-muted-foreground">Waiting...</p>
+                        <p className="text-muted-foreground text-sm">Waiting...</p>
                       </>
                     )}
                   </div>
@@ -435,8 +473,9 @@ function SpectatorScreen({
               })}
             </div>
 
-            <p className="text-muted-foreground text-sm mt-4">
+            <p className="text-muted-foreground text-xs mt-2">
               {duelists.length}/2 duelists joined
+              {spectators.length > 0 && ` • ${spectators.length} spectator${spectators.length > 1 ? 's' : ''}`}
             </p>
           </div>
         </div>
@@ -689,6 +728,16 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [joinAsDuelist, setJoinAsDuelist] = useState(true)
   const [deckChangeDialogOpen, setDeckChangeDialogOpen] = useState(false)
   const [changingDeck, setChangingDeck] = useState('')
+  const [roomSettingsOpen, setRoomSettingsOpen] = useState(false)
+  
+  // Room settings state (for editing)
+  const [editStartingLp, setEditStartingLp] = useState(8000)
+  const [editStartingHandSize, setEditStartingHandSize] = useState(5)
+  const [editMasterRule, setEditMasterRule] = useState('MR5')
+  const [editFirstTurnDraw, setEditFirstTurnDraw] = useState(false)
+  const [editShuffleDeck, setEditShuffleDeck] = useState(true)
+  const [editTimePerTurn, setEditTimePerTurn] = useState<number | null>(null)
+  const [editMatchType, setEditMatchType] = useState('1v1')
   const [selectedDeck, setSelectedDeck] = useState('')
   const [lpChangeAmount, setLpChangeAmount] = useState(1000)
   const [customEventText, setCustomEventText] = useState('')
@@ -994,6 +1043,81 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     
     toast.success('Deck changed!')
     setDeckChangeDialogOpen(false)
+    fetchRoom()
+  }
+
+  const handleToggleHostRole = async () => {
+    if (!room || !isHost) return
+    
+    const myParticipant = room.participants.find(p => p.player_id === selectedPlayer)
+    if (!myParticipant) return
+    
+    const newIsSpectator = !myParticipant.is_spectator
+    
+    // Check if switching to duelist when room is full
+    if (!newIsSpectator && room.match_type === '1v1' && duelists.length >= 2) {
+      toast.error('Cannot switch to duelist - duel slots are full')
+      return
+    }
+    
+    const { error } = await supabase
+      .from('duel_room_participants')
+      .update({ is_spectator: newIsSpectator })
+      .eq('id', myParticipant.id)
+    
+    if (error) {
+      toast.error('Failed to change role')
+      return
+    }
+    
+    toast.success(newIsSpectator ? 'You are now a spectator (still hosting)' : 'You are now a duelist')
+    fetchRoom()
+  }
+
+  const openRoomSettings = () => {
+    if (!room) return
+    // Populate edit state with current room values
+    setEditStartingLp(room.starting_lp || 8000)
+    setEditStartingHandSize(room.starting_hand_size || 5)
+    setEditMasterRule(room.master_rule || 'MR5')
+    setEditFirstTurnDraw(room.first_turn_draw || false)
+    setEditShuffleDeck(room.shuffle_deck !== false)
+    setEditTimePerTurn(room.time_per_turn || null)
+    setEditMatchType(room.match_type || '1v1')
+    setRoomSettingsOpen(true)
+  }
+
+  const handleUpdateRoomSettings = async () => {
+    if (!room || !isHost) return
+    
+    const { error } = await supabase
+      .from('duel_rooms')
+      .update({
+        starting_lp: editStartingLp,
+        starting_hand_size: editStartingHandSize,
+        master_rule: editMasterRule,
+        first_turn_draw: editFirstTurnDraw,
+        shuffle_deck: editShuffleDeck,
+        time_per_turn: editTimePerTurn,
+        match_type: editMatchType,
+      })
+      .eq('id', id)
+    
+    if (error) {
+      toast.error('Failed to update room settings')
+      return
+    }
+    
+    // Update life points for all participants if LP changed
+    if (editStartingLp !== room.starting_lp) {
+      await supabase
+        .from('duel_room_participants')
+        .update({ life_points: editStartingLp })
+        .eq('room_id', id)
+    }
+    
+    toast.success('Room settings updated!')
+    setRoomSettingsOpen(false)
     fetchRoom()
   }
 
@@ -1642,6 +1766,138 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
               <Button onClick={handleStartDuel} className="bg-green-600 hover:bg-green-700">
                 <Play className="h-4 w-4 mr-2" />
                 Start Duel
+              </Button>
+            )}
+
+            {/* Host Controls - Room Settings */}
+            {room.status === 'waiting' && isHost && (
+              <Dialog open={roomSettingsOpen} onOpenChange={setRoomSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" onClick={openRoomSettings}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Room Settings
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Room Settings</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Starting LP</Label>
+                        <Select value={editStartingLp.toString()} onValueChange={(v) => setEditStartingLp(Number(v))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="4000">4000</SelectItem>
+                            <SelectItem value="8000">8000</SelectItem>
+                            <SelectItem value="16000">16000</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Starting Hand</Label>
+                        <Select value={editStartingHandSize.toString()} onValueChange={(v) => setEditStartingHandSize(Number(v))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="4">4 cards</SelectItem>
+                            <SelectItem value="5">5 cards</SelectItem>
+                            <SelectItem value="6">6 cards</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Master Rule</Label>
+                        <Select value={editMasterRule} onValueChange={setEditMasterRule}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="MR3">MR3 (Pre-Link)</SelectItem>
+                            <SelectItem value="MR4">MR4 (Link Era)</SelectItem>
+                            <SelectItem value="MR5">MR5 (Current)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Match Type</Label>
+                        <Select value={editMatchType} onValueChange={setEditMatchType}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1v1">1v1</SelectItem>
+                            <SelectItem value="tag_team">Tag Team</SelectItem>
+                            <SelectItem value="ffa">Free For All</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Time Per Turn (optional)</Label>
+                      <Select 
+                        value={editTimePerTurn?.toString() || 'none'} 
+                        onValueChange={(v) => setEditTimePerTurn(v === 'none' ? null : Number(v))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="No time limit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No time limit</SelectItem>
+                          <SelectItem value="60">60 seconds</SelectItem>
+                          <SelectItem value="120">120 seconds</SelectItem>
+                          <SelectItem value="180">180 seconds</SelectItem>
+                          <SelectItem value="300">300 seconds</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>First Turn Draw</Label>
+                        <p className="text-xs text-muted-foreground">Player going first draws on turn 1</p>
+                      </div>
+                      <Switch checked={editFirstTurnDraw} onCheckedChange={setEditFirstTurnDraw} />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Auto Shuffle Deck</Label>
+                        <p className="text-xs text-muted-foreground">Shuffle deck at duel start</p>
+                      </div>
+                      <Switch checked={editShuffleDeck} onCheckedChange={setEditShuffleDeck} />
+                    </div>
+                    
+                    <Button onClick={handleUpdateRoomSettings} className="w-full">
+                      Save Settings
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Host Toggle Duelist/Spectator */}
+            {room.status === 'waiting' && isHost && isParticipant && (
+              <Button variant="outline" onClick={handleToggleHostRole}>
+                {isDuelist ? (
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Switch to Spectator
+                  </>
+                ) : (
+                  <>
+                    <Swords className="h-4 w-4 mr-2" />
+                    Switch to Duelist
+                  </>
+                )}
               </Button>
             )}
 
