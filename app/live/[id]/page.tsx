@@ -376,6 +376,9 @@ function SpectatorScreen({
   isDuelist: boolean
   fetchDuelGameCards: () => void
 }) {
+  // Derive spectators from room participants
+  const spectators = room.participants.filter(p => p.is_spectator)
+  
   const phases: { key: TurnPhase; label: string }[] = [
     { key: 'draw', label: 'DP' },
     { key: 'standby', label: 'SP' },
