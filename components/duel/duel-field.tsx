@@ -319,21 +319,20 @@ export function DuelField({
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Main Field Mat */}
+      {/* Main Field Mat - seamless DSOD background */}
       <div 
-        className="flex-1 relative rounded-xl overflow-hidden"
+        className="flex-1 relative overflow-hidden"
         style={{
-          background: 'linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-          boxShadow: 'inset 0 0 100px rgba(0, 200, 255, 0.05), 0 0 40px rgba(0, 0, 0, 0.5)',
+          background: 'transparent',
         }}
       >
-        {/* Field pattern overlay */}
+        {/* Subtle field pattern overlay */}
         <div 
-          className="absolute inset-0 opacity-10"
+          className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `
-              radial-gradient(circle at 50% 0%, rgba(0, 200, 255, 0.3) 0%, transparent 50%),
-              radial-gradient(circle at 50% 100%, rgba(255, 150, 0, 0.3) 0%, transparent 50%)
+              radial-gradient(circle at 50% 0%, rgba(0, 200, 255, 0.2) 0%, transparent 50%),
+              radial-gradient(circle at 50% 100%, rgba(255, 150, 0, 0.2) 0%, transparent 50%)
             `,
           }}
         />
@@ -364,12 +363,28 @@ export function DuelField({
             </div>
 
             {/* Opponent Hand (face-down cards shown at top) */}
-            <div className="flex justify-center gap-0.5 py-1">
-              {organizedCards.opponent.hand.map((card) => (
-                <DuelCard key={card.id} card={card} isOwner={false} size="sm" showActions={false} />
-              ))}
-              {organizedCards.opponent.hand.length === 0 && (
-                <div className="text-[10px] text-muted-foreground/50">Empty hand</div>
+            <div 
+              className="flex justify-center gap-1 py-2 px-4 rounded-lg mx-4 mb-1"
+              style={{
+                background: 'linear-gradient(to bottom, rgba(200, 100, 0, 0.15), transparent)',
+              }}
+            >
+              {organizedCards.opponent.hand.length > 0 ? (
+                <>
+                  <span className="absolute left-4 top-0.5 text-[10px] text-amber-500/70 font-semibold">Opponent's Hand ({organizedCards.opponent.hand.length})</span>
+                  <div className="flex justify-center gap-1 w-full pt-3">
+                    {organizedCards.opponent.hand.map((card, idx) => (
+                      <div key={card.id} className="relative">
+                        <DuelCard card={card} isOwner={false} size="sm" showActions={false} />
+                        <span className="absolute -top-1 -right-1 text-[8px] bg-amber-700 text-white px-1 rounded">
+                          {idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-muted-foreground/50 py-2 w-full text-center">Opponent's hand is empty</div>
               )}
             </div>
 
@@ -560,27 +575,35 @@ export function DuelField({
 
             {/* My Hand */}
             <div 
-              className="flex justify-center gap-1 py-2 px-4 rounded-lg mx-4"
+              className="flex justify-center gap-1 py-3 px-4 rounded-lg mx-4 relative"
               style={{
-                background: 'linear-gradient(to top, rgba(0, 100, 150, 0.2), transparent)',
+                background: 'linear-gradient(to top, rgba(0, 100, 200, 0.2), transparent)',
               }}
             >
-              {organizedCards.my.hand.map((card) => (
-                <DuelCard
-                  key={card.id}
-                  card={card}
-                  isOwner={true}
-                  size="md"
-                  className="hover:-translate-y-2 hover:z-10 transition-transform"
-                  onSummon={handleSummon}
-                  onSetSpell={handleSetSpell}
-                  onActivate={handleActivate}
-                  onActivateField={handleActivateField}
-                  onSendToGraveyard={() => handleSendToGraveyard(card)}
-                />
-              ))}
-              {organizedCards.my.hand.length === 0 && (
-                <div className="text-xs text-muted-foreground/50 py-4">Your hand is empty</div>
+              <span className="absolute left-4 bottom-full mb-1 text-[10px] text-cyan-400/80 font-semibold">Your Hand ({organizedCards.my.hand.length})</span>
+              {organizedCards.my.hand.length > 0 ? (
+                <div className="flex justify-center gap-1 flex-wrap">
+                  {organizedCards.my.hand.map((card, idx) => (
+                    <div key={card.id} className="relative">
+                      <DuelCard
+                        card={card}
+                        isOwner={true}
+                        size="md"
+                        className="hover:-translate-y-3 hover:z-20 transition-transform"
+                        onSummon={handleSummon}
+                        onSetSpell={handleSetSpell}
+                        onActivate={handleActivate}
+                        onActivateField={handleActivateField}
+                        onSendToGraveyard={() => handleSendToGraveyard(card)}
+                      />
+                      <span className="absolute -top-1 -right-1 text-[8px] bg-blue-700 text-white px-1 rounded">
+                        {idx + 1}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground/50 py-4 w-full text-center">Your hand is empty - draw cards to begin</div>
               )}
             </div>
           </div>
