@@ -505,9 +505,9 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex-1">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
+            <div className="flex-1 flex flex-col gap-6">
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h1 
                       className="text-3xl font-bold"
@@ -581,39 +581,76 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                   )}
                 </div>
                 
-                <div className="flex gap-2">
-                  <ProfileEditor 
-                    playerId={player.id}
-                    profile={profile}
-                    decks={player.decks}
-                    allPlayers={allPlayers}
-                  />
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-card border-primary/30">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete {player.nickname}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently remove this duelist and all their match history. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={handleDelete}
-                          disabled={deleting}
-                          className="bg-destructive hover:bg-destructive/80"
-                        >
-                          {deleting ? 'Deleting...' : 'Delete'}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                {/* Right Column: Featured Deck Card + Buttons */}
+                <div className="flex flex-col gap-3 w-64">
+                  {/* Featured Deck Section - Moved to Right */}
+                  {featuredDeck && (
+                    <div 
+                      className="border rounded-lg overflow-hidden"
+                      style={{ 
+                        backgroundColor: `${themeConfig.colors.card}80`,
+                        borderColor: themeConfig.colors.border 
+                      }}
+                    >
+                      <div className="p-4 flex flex-col items-center text-center">
+                        <Star className="h-5 w-5 text-yellow-500 mb-2" />
+                        <p className="text-xs uppercase tracking-wide mb-1" style={{ color: themeConfig.colors.muted }}>
+                          Featured Deck
+                        </p>
+                        <p className="font-semibold text-sm mb-3" style={{ color: themeConfig.colors.text }}>
+                          {featuredDeck.name}
+                        </p>
+                        {featuredDeck.mvp_card_name && (
+                          <div className="w-full">
+                            <div className="h-48 rounded-lg bg-gradient-to-b from-purple-900 to-purple-950 flex items-center justify-center mb-2 border-2 border-purple-700/50 overflow-hidden">
+                              <div className="text-center px-2">
+                                <p className="text-xs text-purple-300 uppercase tracking-widest mb-1">MVP Card</p>
+                                <p className="text-sm font-bold text-white" style={{ color: themeConfig.colors.accent }}>
+                                  {featuredDeck.mvp_card_name}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2">
+                    <ProfileEditor 
+                      playerId={player.id}
+                      profile={profile}
+                      decks={player.decks}
+                      allPlayers={allPlayers}
+                    />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full border-destructive/50 text-destructive hover:bg-destructive/10 justify-center">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-card border-primary/30">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {player.nickname}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove this duelist and all their match history. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="bg-destructive hover:bg-destructive/80"
+                          >
+                            {deleting ? 'Deleting...' : 'Delete'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </div>
 
@@ -649,46 +686,6 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                           <span className="text-red-500">{rivalRecord.losses}L</span>
                         </p>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Featured Deck Section */}
-              {featuredDeck && (
-                <Card 
-                  className="mt-4 border"
-                  style={{ 
-                    backgroundColor: `${themeConfig.colors.card}80`,
-                    borderColor: themeConfig.colors.border 
-                  }}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Star className="h-5 w-5 text-yellow-500" />
-                      <div className="flex-1">
-                        <p className="text-xs uppercase tracking-wide" style={{ color: themeConfig.colors.muted }}>
-                          Featured Deck
-                        </p>
-                        <p className="font-semibold" style={{ color: themeConfig.colors.text }}>
-                          {featuredDeck.name}
-                        </p>
-                        {featuredDeck.archetype && (
-                          <p className="text-xs" style={{ color: themeConfig.colors.muted }}>
-                            {featuredDeck.archetype}
-                          </p>
-                        )}
-                      </div>
-                      {featuredDeck.mvp_card_name && (
-                        <div className="text-right">
-                          <p className="text-xs uppercase tracking-wide" style={{ color: themeConfig.colors.muted }}>
-                            MVP
-                          </p>
-                          <p className="text-sm" style={{ color: themeConfig.colors.accent }}>
-                            {featuredDeck.mvp_card_name}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
