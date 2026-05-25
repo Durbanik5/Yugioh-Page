@@ -38,6 +38,7 @@ import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
 import { MatchCard } from '@/components/match-card'
 import { PlayerCollection } from '@/components/player-collection'
+import { MVPCardDisplay } from '@/components/mvp-card-display'
 import { ProfileEditor } from '@/components/profile-editor'
 import { PROFILE_THEMES, YUGIOH_SERIES, CARD_MECHANICS, CARD_TYPES } from '@/lib/profile-themes'
 import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch, PlayerProfile as PlayerProfileType } from '@/lib/types'
@@ -506,11 +507,11 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
             </Avatar>
 
             <div className="flex-1 flex flex-col gap-6">
-              <div className="flex items-start justify-between gap-6 h-full">
+              <div className="flex items-start justify-between gap-6">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h1 
-                      className="text-3xl font-bold"
+                      className="text-2xl font-bold"
                       style={{ fontFamily: 'var(--font-orbitron)', color: themeConfig.colors.text }}
                     >
                       {player.nickname}
@@ -530,7 +531,7 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                     </p>
                   )}
                   
-                  <p style={{ color: themeConfig.colors.muted }}>
+                  <p className="text-sm" style={{ color: themeConfig.colors.muted }}>
                     Registered {new Date(player.created_at).toLocaleDateString()}
                   </p>
                   
@@ -622,37 +623,56 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                   )}
                 </div>
                 
-                {/* Right Column: Featured Deck - Full Height */}
+                {/* Right Column: Featured Deck */}
                 {featuredDeck && (
                   <div 
-                    className="border rounded-lg overflow-hidden flex flex-col w-64"
+                    className="border rounded-lg overflow-hidden flex flex-col w-56"
                     style={{ 
                       backgroundColor: `${themeConfig.colors.card}80`,
                       borderColor: themeConfig.colors.border,
-                      minHeight: '500px'
+                      minHeight: '280px'
                     }}
                   >
-                    <div className="p-4 flex flex-col items-center text-center flex-1">
-                      <Star className="h-5 w-5 text-yellow-500 mb-2" />
+                    <div className="p-3 flex flex-col items-center text-center flex-1">
+                      <Star className="h-4 w-4 text-yellow-500 mb-1" />
                       <p className="text-xs uppercase tracking-wide mb-1" style={{ color: themeConfig.colors.muted }}>
                         Featured Deck
                       </p>
-                      <p className="font-semibold text-sm mb-4" style={{ color: themeConfig.colors.text }}>
+                      <p className="font-semibold text-xs mb-2" style={{ color: themeConfig.colors.text }}>
                         {featuredDeck.name}
                       </p>
                       {featuredDeck.mvp_card_name && (
-                        <div className="w-full flex-1 flex flex-col items-center justify-center">
-                          <div className="w-full h-full rounded-lg bg-gradient-to-b from-purple-900 to-purple-950 flex items-center justify-center border-2 border-purple-700/50 overflow-hidden p-4">
-                            <div className="text-center">
-                              <p className="text-xs text-purple-300 uppercase tracking-widest mb-2">MVP Card</p>
-                              <p className="text-sm font-bold text-white" style={{ color: themeConfig.colors.accent }}>
-                                {featuredDeck.mvp_card_name}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        <MVPCardDisplay mvpCardName={featuredDeck.mvp_card_name} themeConfig={themeConfig} />
                       )}
                     </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Achievement Showcase - Centralized */}
+              <div>
+                <p className="text-xs uppercase tracking-wide mb-3" style={{ color: themeConfig.colors.muted }}>
+                  Achievement Showcase
+                </p>
+                {earnedAchievements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No achievements earned yet. Start dueling!</p>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {earnedAchievements.slice(0, 6).map((achievement) => (
+                      <div 
+                        key={achievement.id}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-primary/20 hover:border-primary/50 transition-colors group"
+                        title={achievement.description}
+                      >
+                        <achievement.icon className={`h-5 w-5 ${achievement.color}`} />
+                        <span className="text-sm font-medium text-foreground">{achievement.name}</span>
+                      </div>
+                    ))}
+                    {earnedAchievements.length > 6 && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-border">
+                        <span className="text-sm text-muted-foreground">+{earnedAchievements.length - 6} more</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -693,34 +713,6 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                   </CardContent>
                 </Card>
               )}
-
-              {/* Achievement Showcase */}
-              <div className="mt-6">
-                <p className="text-xs uppercase tracking-wide mb-3" style={{ color: themeConfig.colors.muted }}>
-                  Achievement Showcase
-                </p>
-                {earnedAchievements.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No achievements earned yet. Start dueling!</p>
-                ) : (
-                  <div className="flex flex-wrap gap-3">
-                    {earnedAchievements.slice(0, 6).map((achievement) => (
-                      <div 
-                        key={achievement.id}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-primary/20 hover:border-primary/50 transition-colors group"
-                        title={achievement.description}
-                      >
-                        <achievement.icon className={`h-5 w-5 ${achievement.color}`} />
-                        <span className="text-sm font-medium text-foreground">{achievement.name}</span>
-                      </div>
-                    ))}
-                    {earnedAchievements.length > 6 && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/50 border border-border">
-                        <span className="text-sm text-muted-foreground">+{earnedAchievements.length - 6} more</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </CardContent>
