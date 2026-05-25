@@ -1,6 +1,16 @@
 // Yu-Gi-Oh! Duel Engine Types
 // Based on official OCG/TCG rulings and YGOPro/EDOPro engine patterns
 
+// Simple phase type used for duel turn progression
+export type DuelPhase = 
+  | 'draw'
+  | 'standby'
+  | 'main1'
+  | 'battle'
+  | 'main2'
+  | 'end'
+
+// Detailed phase type for battle mechanics
 export type Phase = 
   | 'draw'
   | 'standby'
@@ -121,23 +131,21 @@ export interface GameState {
   roomId: string
   turnPlayer: string
   turnCount: number
-  phase: Phase
-  players: Record<string, PlayerState>
-  cards: GameCard[]
+  phase: DuelPhase
   chain: ChainLink[]
   isChainBuilding: boolean
   priorityPlayer: string | null
   
   // Flags for the current turn/phase
-  canNormalSummon: boolean
+  canNormalSummon?: boolean
   battlePhaseEnabled: boolean // First turn player cannot battle
   
   // Pending actions waiting for response
   pendingAction?: {
-    type: 'summon' | 'activate' | 'attack' | 'effect'
-    playerId: string
-    cardId: string
-    data?: Record<string, unknown>
+  type: 'summon' | 'activate' | 'attack' | 'effect'
+  playerId: string
+  cardId: string
+  data?: Record<string, unknown>
   }
   
   // Response window state

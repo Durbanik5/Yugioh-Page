@@ -523,17 +523,27 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
           .eq('location', 'monster_zone')
 
         // Update game state
+        const newTurnCount = (gameState?.turnCount || 1) + 1
         await supabase
           .from('duel_game_state')
           .update({
             turn_player: opponent.player_id,
-            turn_count: (gameState?.turnCount || 1) + 1,
+            turn_count: newTurnCount,
             phase: 'draw',
             priority_player: opponent.player_id,
           })
           .eq('room_id', room.id)
 
-        toast.info(`Turn ${(gameState?.turnCount || 1) + 1}: Opponent's turn`)
+        // Update local state
+        setGameState(prev => prev ? {
+          ...prev,
+          turnPlayer: opponent.player_id,
+          turnCount: newTurnCount,
+          phase: 'draw',
+          priorityPlayer: opponent.player_id,
+        } : null)
+
+        toast.info(`Turn ${newTurnCount}: Opponent's turn`)
       }
     } else {
       await supabase
@@ -541,10 +551,13 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
         .update({ phase: newPhase })
         .eq('room_id', room.id)
 
-      // Auto-draw at draw phase start
-      if (newPhase === 'standby' && gameState?.phase === 'draw') {
-        // Player already drew at turn start, handled by turn change
-      }
+      // Update local state
+      setGameState(prev => prev ? {
+        ...prev,
+        phase: newPhase,
+      } : null)
+
+      toast.info(`Moved to ${newPhase} phase`)
     }
 
     onCardsChanged()
