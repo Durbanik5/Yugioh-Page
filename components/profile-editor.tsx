@@ -51,9 +51,10 @@ interface ProfileEditorProps {
   profile: PlayerProfile | null
   decks: DeckWithCards[]
   allPlayers: Player[]
+  iconOnly?: boolean
 }
 
-export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileEditorProps) {
+export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly = false }: ProfileEditorProps) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -135,10 +136,21 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers }: ProfileE
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="border-primary/50 hover:bg-primary/10">
-          <Settings className="h-4 w-4 mr-2" />
-          Edit Profile
-        </Button>
+        {iconOnly ? (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="border-primary/50 hover:bg-primary/10"
+            title="Edit Profile"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="border-primary/50 hover:bg-primary/10">
+            <Settings className="h-4 w-4 mr-2" />
+            Edit Profile
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="bg-card border-primary/30 max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
