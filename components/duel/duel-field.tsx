@@ -106,6 +106,14 @@ export function DuelField({
     }
   }, [allCards, myPlayerId, opponentPlayerId])
 
+  // Debug logging
+  console.log('[v0] DuelField - allCards:', allCards.length, 'myPlayerId:', myPlayerId, 'opponentPlayerId:', opponentPlayerId)
+  console.log('[v0] DuelField - my hand:', organizedCards.my.hand.length, 'my deck:', organizedCards.my.deck.length)
+  console.log('[v0] DuelField - opponent hand:', organizedCards.opponent.hand.length)
+  if (organizedCards.my.hand.length > 0) {
+    console.log('[v0] DuelField - first hand card:', organizedCards.my.hand[0])
+  }
+
   // Card action handlers
   const handleDraw = useCallback(async () => {
     const result = await drawCards(room.id, myPlayerId, 1)
