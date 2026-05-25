@@ -522,22 +522,31 @@ function SpectatorScreen({
       )}
 
       {/* Duelists Display */}
-      {showPlayField && room.status === 'active' && duelists.length === 2 && isDuelist ? (
-        // YGOPro-style Play Field
-        <div className="absolute inset-4 top-20 bottom-20 flex items-center justify-center z-10">
-          <DuelField
-            room={room}
-            myPlayerId={selectedPlayer}
-            opponentPlayerId={duelists.find(d => d.player_id !== selectedPlayer)?.player_id || null}
-            myPlayer={duelists.find(d => d.player_id === selectedPlayer)?.player || { id: '', nickname: 'You', avatar_url: null, auth_user_id: null, community_points: 0, created_at: '', updated_at: '' }}
-            opponentPlayer={duelists.find(d => d.player_id !== selectedPlayer)?.player || null}
-            allCards={duelGameCards}
-            myLifePoints={duelists.find(d => d.player_id === selectedPlayer)?.life_points || 8000}
-            opponentLifePoints={duelists.find(d => d.player_id !== selectedPlayer)?.life_points || 8000}
-            isMyTurn={room.current_turn_player_id === selectedPlayer}
-            onCardsChanged={fetchDuelGameCards}
-          />
-        </div>
+      {showPlayField && room.status === 'active' && duelists.length === 2 ? (
+        // YGOPro-style Play Field - show for anyone viewing a 1v1 duel
+        (() => {
+          // Determine perspective: if viewer is a duelist use their view, otherwise use first duelist's view
+          const viewerPlayerId = isDuelist ? selectedPlayer : duelists[0].player_id
+          const viewerDuelist = duelists.find(d => d.player_id === viewerPlayerId)
+          const opponentDuelist = duelists.find(d => d.player_id !== viewerPlayerId)
+          
+          return (
+            <div className="absolute inset-4 top-20 bottom-20 flex items-center justify-center z-10">
+              <DuelField
+                room={room}
+                myPlayerId={viewerPlayerId}
+                opponentPlayerId={opponentDuelist?.player_id || null}
+                myPlayer={viewerDuelist?.player || duelists[0].player}
+                opponentPlayer={opponentDuelist?.player || null}
+                allCards={duelGameCards}
+                myLifePoints={viewerDuelist?.life_points || 8000}
+                opponentLifePoints={opponentDuelist?.life_points || 8000}
+                isMyTurn={room.current_turn_player_id === viewerPlayerId}
+                onCardsChanged={fetchDuelGameCards}
+              />
+            </div>
+          )
+        })()
       ) : isFFA ? (
         // Circular layout for FFA with many participants
         <div className="absolute inset-0 flex items-center justify-center">

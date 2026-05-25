@@ -13,7 +13,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { 
-  Layers, Flame, Ban, RotateCcw, Eye, Shuffle
+  Layers, Flame, Ban, RotateCcw, Eye, Shuffle, Sparkles, Heart
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -149,53 +149,41 @@ export function DuelField({
 
     setPendingAction(null)
     setSelectingZone(null)
-    setSelectedCard(null)
     onCardsChanged()
   }, [pendingAction, onCardsChanged])
 
-  const handleSetSpellTrap = useCallback(async (card: DuelGameCard) => {
+  const handleSetSpell = useCallback(async (card: DuelGameCard) => {
     setPendingAction({ type: 'set_spell', card })
     setSelectingZone('spell')
   }, [])
 
   const handleActivate = useCallback(async (card: DuelGameCard) => {
-    // Check if it's a field spell
-    if (card.card_type === 'spell' && card.card_name.toLowerCase().includes('field')) {
-      const result = await activateFieldSpell(card.id)
-      if (result.success) {
-        toast.success(`Activated ${card.card_name}`)
-        onCardsChanged()
-      } else {
-        toast.error(result.error || 'Failed to activate')
-      }
-    } else if (card.location === 'hand') {
-      // Need to select a zone
-      setPendingAction({ type: 'activate', card })
-      setSelectingZone('spell')
+    setPendingAction({ type: 'activate', card })
+    setSelectingZone('spell')
+  }, [])
+
+  const handleActivateField = useCallback(async (card: DuelGameCard) => {
+    const result = await activateFieldSpell(card.id)
+    if (result.success) {
+      toast.success(`Activated ${card.card_name}`)
+      onCardsChanged()
     } else {
-      // Already on field, just flip face-up
-      const result = await activateSpellTrap(card.id)
-      if (result.success) {
-        toast.success(`Activated ${card.card_name}`)
-        onCardsChanged()
-      } else {
-        toast.error(result.error || 'Failed to activate')
-      }
+      toast.error(result.error || 'Failed to activate')
     }
   }, [onCardsChanged])
 
   const handleFlip = useCallback(async (card: DuelGameCard) => {
-    const result = await flipCard(card.id, 'face_up_attack')
+    const result = await flipCard(card.id)
     if (result.success) {
-      toast.success(`Flip summoned ${card.card_name}`)
+      toast.success(`Flipped ${card.card_name}`)
       onCardsChanged()
     } else {
       toast.error(result.error || 'Failed to flip')
     }
   }, [onCardsChanged])
 
-  const handleChangePosition = useCallback(async (card: DuelGameCard, position: CardPosition) => {
-    const result = await changePosition(card.id, position)
+  const handleChangePosition = useCallback(async (card: DuelGameCard, newPosition: CardPosition) => {
+    const result = await changePosition(card.id, newPosition)
     if (result.success) {
       toast.success('Changed position')
       onCardsChanged()
@@ -207,15 +195,15 @@ export function DuelField({
   const handleSendToGraveyard = useCallback(async (card: DuelGameCard) => {
     const result = await sendToGraveyard(card.id)
     if (result.success) {
-      toast.success(`Sent ${card.card_name} to Graveyard`)
+      toast.success(`Sent ${card.card_name} to graveyard`)
       onCardsChanged()
     } else {
       toast.error(result.error || 'Failed')
     }
   }, [onCardsChanged])
 
-  const handleBanish = useCallback(async (card: DuelGameCard, faceDown: boolean = false) => {
-    const result = await banishCard(card.id, faceDown)
+  const handleBanish = useCallback(async (card: DuelGameCard) => {
+    const result = await banishCard(card.id)
     if (result.success) {
       toast.success(`Banished ${card.card_name}`)
       onCardsChanged()
@@ -234,382 +222,409 @@ export function DuelField({
     }
   }, [onCardsChanged])
 
-  const handleReturnToDeck = useCallback(async (card: DuelGameCard, toTop: boolean = false) => {
-    const result = await returnToDeck(card.id, toTop)
-    if (result.success) {
-      toast.success(`Returned ${card.card_name} to deck`)
-      onCardsChanged()
-    } else {
-      toast.error(result.error || 'Failed')
-    }
-  }, [onCardsChanged])
-
-  const handleAddCounter = useCallback(async (card: DuelGameCard) => {
-    const result = await updateCounters(card.id, 1)
-    if (result.success) {
-      onCardsChanged()
-    }
-  }, [onCardsChanged])
-
-  const handleRemoveCounter = useCallback(async (card: DuelGameCard) => {
-    const result = await updateCounters(card.id, -1)
-    if (result.success) {
-      onCardsChanged()
-    }
-  }, [onCardsChanged])
-
   const handleShuffleDeck = useCallback(async () => {
     const result = await shuffleDeck(room.id, myPlayerId)
     if (result.success) {
-      toast.success('Deck shuffled')
+      toast.success('Shuffled deck')
       onCardsChanged()
     } else {
       toast.error(result.error || 'Failed to shuffle')
     }
   }, [room.id, myPlayerId, onCardsChanged])
 
-  // Cancel zone selection
-  const cancelSelection = useCallback(() => {
-    setPendingAction(null)
-    setSelectingZone(null)
-    setSelectedCard(null)
-  }, [])
+  // Card zone dimensions
+  const cardWidth = 'w-16'
+  const cardHeight = 'h-24'
 
-  // Render a row of zones (monster or spell/trap)
-  const renderZoneRow = (
-    zones: (DuelGameCard | null)[],
-    type: 'monster' | 'spell',
-    isMyField: boolean,
-    reversed: boolean = false
+  // Render a single zone
+  const renderZone = (
+    card: DuelGameCard | null, 
+    type: 'monster' | 'spell', 
+    index: number, 
+    isOwner: boolean,
+    isSelecting: boolean = false
   ) => {
-    const orderedZones = reversed ? [...zones].reverse() : zones
-    const isSelecting = selectingZone === type && pendingAction && isMyField
+    const zoneColors = {
+      monster: 'bg-amber-900/20 border-amber-600/40 hover:border-amber-500/60',
+      spell: 'bg-teal-900/20 border-teal-600/40 hover:border-teal-500/60',
+    }
+
+    if (isSelecting && !card) {
+      return (
+        <button
+          key={`${type}-${index}`}
+          onClick={() => handleZoneSelect(index)}
+          className={cn(
+            cardWidth, cardHeight,
+            'rounded-md border-2 border-dashed transition-all',
+            'bg-green-500/30 border-green-400 animate-pulse cursor-pointer hover:bg-green-500/50'
+          )}
+        >
+          <span className="text-xs text-green-300">Select</span>
+        </button>
+      )
+    }
+
+    if (card) {
+      return (
+        <DuelCard
+          key={card.id}
+          card={card}
+          isOwner={isOwner}
+          size="md"
+          onSummon={handleSummon}
+          onSetSpell={handleSetSpell}
+          onActivate={handleActivate}
+          onActivateField={handleActivateField}
+          onFlip={handleFlip}
+          onChangePosition={handleChangePosition}
+          onSendToGraveyard={() => handleSendToGraveyard(card)}
+          onBanish={() => handleBanish(card)}
+          onReturnToHand={() => handleReturnToHand(card)}
+        />
+      )
+    }
 
     return (
-      <div className="flex gap-1 justify-center">
-        {orderedZones.map((card, displayIndex) => {
-          const actualIndex = reversed ? 4 - displayIndex : displayIndex
-          const isOccupied = card !== null
+      <div
+        key={`empty-${type}-${index}`}
+        className={cn(
+          cardWidth, cardHeight,
+          'rounded-md border transition-all',
+          zoneColors[type],
+          'flex items-center justify-center'
+        )}
+      >
+        <span className="text-[8px] text-muted-foreground/50 uppercase">{type[0]}{index + 1}</span>
+      </div>
+    )
+  }
 
-          if (isOccupied) {
-            return (
-              <DuelCard
-                key={card.id}
-                card={card}
-                isOwner={isMyField}
-                size="sm"
-                onFlip={isMyField ? () => handleFlip(card) : undefined}
-                onChangePosition={isMyField ? (pos) => handleChangePosition(card, pos) : undefined}
-                onSendToGraveyard={isMyField ? () => handleSendToGraveyard(card) : undefined}
-                onBanish={isMyField ? (fd) => handleBanish(card, fd) : undefined}
-                onReturnToHand={isMyField ? () => handleReturnToHand(card) : undefined}
-                onReturnToDeck={isMyField ? (top) => handleReturnToDeck(card, top) : undefined}
-                onAddCounter={isMyField ? () => handleAddCounter(card) : undefined}
-                onRemoveCounter={isMyField ? () => handleRemoveCounter(card) : undefined}
-                onActivate={isMyField && type === 'spell' ? () => handleActivate(card) : undefined}
-              />
-            )
-          }
-
-          return (
-            <EmptyZone
-              key={`${type}-${actualIndex}`}
-              type={type}
-              size="sm"
-              highlight={isSelecting}
-              onClick={isSelecting ? () => handleZoneSelect(actualIndex) : undefined}
-            />
-          )
-        })}
+  // Render Extra Monster Zone (shared between players)
+  const renderExtraMonsterZone = (position: 'left' | 'right') => {
+    // In MR5, Extra Monster Zones are shared - for simplicity, we'll show them as empty
+    return (
+      <div
+        className={cn(
+          cardWidth, cardHeight,
+          'rounded-md border border-dashed transition-all',
+          'bg-violet-900/20 border-violet-500/40',
+          'flex items-center justify-center'
+        )}
+      >
+        <Sparkles className="h-4 w-4 text-violet-400/50" />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-2 p-2 bg-gradient-to-b from-green-950/50 to-green-900/30 rounded-lg border border-green-800/30">
-      {/* Zone selection overlay */}
-      {selectingZone && (
-        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-card p-4 rounded-lg text-center">
-            <p className="text-sm mb-2">Select a {selectingZone === 'monster' ? 'Monster' : 'Spell/Trap'} Zone</p>
-            <Button variant="outline" size="sm" onClick={cancelSelection}>
+    <div className="w-full h-full flex flex-col">
+      {/* Main Field Mat */}
+      <div 
+        className="flex-1 relative rounded-xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          boxShadow: 'inset 0 0 100px rgba(0, 200, 255, 0.05), 0 0 40px rgba(0, 0, 0, 0.5)',
+        }}
+      >
+        {/* Field pattern overlay */}
+        <div 
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `
+              radial-gradient(circle at 50% 0%, rgba(0, 200, 255, 0.3) 0%, transparent 50%),
+              radial-gradient(circle at 50% 100%, rgba(255, 150, 0, 0.3) 0%, transparent 50%)
+            `,
+          }}
+        />
+
+        {/* Content Container */}
+        <div className="absolute inset-0 flex flex-col p-3">
+          
+          {/* Opponent Side */}
+          <div className="flex-1 flex flex-col justify-start gap-1">
+            
+            {/* Opponent Info Bar */}
+            <div className="flex items-center justify-between px-2 py-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-red-300">{opponentPlayer?.nickname || 'Opponent'}</span>
+                <div className="flex items-center gap-1 bg-red-950/50 px-2 py-0.5 rounded border border-red-800/50">
+                  <Heart className="h-3 w-3 text-red-500" />
+                  <span className="text-sm font-bold text-red-400">{opponentLifePoints}</span>
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => setGraveyardOpen('opponent')}>
+                  <Flame className="h-3 w-3 mr-0.5 text-orange-400" />{organizedCards.opponent.graveyard.length}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => setBanishedOpen('opponent')}>
+                  <Ban className="h-3 w-3 mr-0.5 text-purple-400" />{organizedCards.opponent.banished.length}
+                </Button>
+              </div>
+            </div>
+
+            {/* Opponent Hand (face-down cards shown at top) */}
+            <div className="flex justify-center gap-0.5 py-1">
+              {organizedCards.opponent.hand.map((card) => (
+                <DuelCard key={card.id} card={card} isOwner={false} size="sm" showActions={false} />
+              ))}
+              {organizedCards.opponent.hand.length === 0 && (
+                <div className="text-[10px] text-muted-foreground/50">Empty hand</div>
+              )}
+            </div>
+
+            {/* Opponent Field Layout */}
+            <div className="flex justify-center items-center gap-2">
+              {/* Opponent Extra Deck & Field Spell (left side) */}
+              <div className="flex flex-col gap-1">
+                <div className="relative cursor-pointer">
+                  <EmptyZone type="extra" size="sm" />
+                  <span className="absolute -bottom-1 -right-1 text-[8px] bg-violet-600 text-white px-1 rounded">
+                    {organizedCards.opponent.extraDeck.length}
+                  </span>
+                </div>
+                {organizedCards.opponent.fieldZone ? (
+                  <DuelCard card={organizedCards.opponent.fieldZone} isOwner={false} size="sm" showActions={false} />
+                ) : (
+                  <EmptyZone type="field" size="sm" />
+                )}
+              </div>
+
+              {/* Opponent Main Zones */}
+              <div className="flex flex-col gap-1">
+                {/* Spell/Trap Row */}
+                <div className="flex gap-1 justify-center">
+                  {organizedCards.opponent.spellZones.map((card, i) => renderZone(card, 'spell', i, false))}
+                </div>
+                {/* Monster Row */}
+                <div className="flex gap-1 justify-center">
+                  {organizedCards.opponent.monsterZones.map((card, i) => renderZone(card, 'monster', i, false))}
+                </div>
+              </div>
+
+              {/* Opponent Deck & Graveyard (right side) */}
+              <div className="flex flex-col gap-1">
+                <div className="relative cursor-pointer" onClick={() => setBanishedOpen('opponent')}>
+                  {organizedCards.opponent.banished.length > 0 ? (
+                    <DuelCard card={organizedCards.opponent.banished[0]} isOwner={false} size="sm" showActions={false} />
+                  ) : (
+                    <EmptyZone type="banished" size="sm" />
+                  )}
+                  {organizedCards.opponent.banished.length > 0 && (
+                    <span className="absolute -bottom-1 -right-1 text-[8px] bg-purple-600 text-white px-1 rounded">
+                      {organizedCards.opponent.banished.length}
+                    </span>
+                  )}
+                </div>
+                <div className="relative cursor-pointer" onClick={() => setGraveyardOpen('opponent')}>
+                  {organizedCards.opponent.graveyard.length > 0 ? (
+                    <DuelCard card={organizedCards.opponent.graveyard[0]} isOwner={false} size="sm" showActions={false} />
+                  ) : (
+                    <EmptyZone type="graveyard" size="sm" />
+                  )}
+                  {organizedCards.opponent.graveyard.length > 0 && (
+                    <span className="absolute -bottom-1 -right-1 text-[8px] bg-orange-600 text-white px-1 rounded">
+                      {organizedCards.opponent.graveyard.length}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <EmptyZone type="deck" size="sm" />
+                  <span className="absolute -bottom-1 -right-1 text-[8px] bg-blue-600 text-white px-1 rounded">
+                    {organizedCards.opponent.deck.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center Divider with Extra Monster Zones */}
+          <div className="flex items-center justify-center py-2 relative">
+            <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+            <div className="flex gap-[200px] relative z-10">
+              {renderExtraMonsterZone('left')}
+              {renderExtraMonsterZone('right')}
+            </div>
+            <Badge 
+              className={cn(
+                "absolute left-4 px-3 py-1",
+                isMyTurn 
+                  ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30" 
+                  : "bg-slate-800 text-slate-400"
+              )}
+            >
+              {isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"}
+            </Badge>
+          </div>
+
+          {/* My Side */}
+          <div className="flex-1 flex flex-col justify-end gap-1">
+            
+            {/* My Field Layout */}
+            <div className="flex justify-center items-center gap-2">
+              {/* My Deck & Graveyard (left side for me) */}
+              <div className="flex flex-col gap-1">
+                <div className="relative cursor-pointer hover:scale-105 transition-transform" onClick={handleDraw} title="Click to draw">
+                  <EmptyZone type="deck" size="sm" />
+                  <span className="absolute -bottom-1 -right-1 text-[8px] bg-blue-600 text-white px-1 rounded">
+                    {organizedCards.my.deck.length}
+                  </span>
+                </div>
+                <div className="relative cursor-pointer" onClick={() => setGraveyardOpen('mine')}>
+                  {organizedCards.my.graveyard.length > 0 ? (
+                    <DuelCard card={organizedCards.my.graveyard[0]} isOwner={true} size="sm" showActions={false} />
+                  ) : (
+                    <EmptyZone type="graveyard" size="sm" />
+                  )}
+                  {organizedCards.my.graveyard.length > 0 && (
+                    <span className="absolute -bottom-1 -right-1 text-[8px] bg-orange-600 text-white px-1 rounded">
+                      {organizedCards.my.graveyard.length}
+                    </span>
+                  )}
+                </div>
+                <div className="relative cursor-pointer" onClick={() => setBanishedOpen('mine')}>
+                  {organizedCards.my.banished.length > 0 ? (
+                    <DuelCard card={organizedCards.my.banished[0]} isOwner={true} size="sm" showActions={false} />
+                  ) : (
+                    <EmptyZone type="banished" size="sm" />
+                  )}
+                  {organizedCards.my.banished.length > 0 && (
+                    <span className="absolute -bottom-1 -right-1 text-[8px] bg-purple-600 text-white px-1 rounded">
+                      {organizedCards.my.banished.length}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* My Main Zones */}
+              <div className="flex flex-col gap-1">
+                {/* Monster Row */}
+                <div className="flex gap-1 justify-center">
+                  {organizedCards.my.monsterZones.map((card, i) => 
+                    renderZone(card, 'monster', i, true, selectingZone === 'monster')
+                  )}
+                </div>
+                {/* Spell/Trap Row */}
+                <div className="flex gap-1 justify-center">
+                  {organizedCards.my.spellZones.map((card, i) => 
+                    renderZone(card, 'spell', i, true, selectingZone === 'spell')
+                  )}
+                </div>
+              </div>
+
+              {/* My Field Spell & Extra Deck (right side for me) */}
+              <div className="flex flex-col gap-1">
+                {organizedCards.my.fieldZone ? (
+                  <DuelCard 
+                    card={organizedCards.my.fieldZone} 
+                    isOwner={true} 
+                    size="sm"
+                    onSendToGraveyard={() => handleSendToGraveyard(organizedCards.my.fieldZone!)}
+                  />
+                ) : (
+                  <EmptyZone type="field" size="sm" />
+                )}
+                <div className="relative cursor-pointer" onClick={() => setExtraDeckOpen(true)}>
+                  <EmptyZone type="extra" size="sm" />
+                  <span className="absolute -bottom-1 -right-1 text-[8px] bg-violet-600 text-white px-1 rounded">
+                    {organizedCards.my.extraDeck.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* My Info Bar */}
+            <div className="flex items-center justify-between px-2 py-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-cyan-300">{myPlayer.nickname}</span>
+                <div className="flex items-center gap-1 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/50">
+                  <Heart className="h-3 w-3 text-cyan-500" />
+                  <span className="text-sm font-bold text-cyan-400">{myLifePoints}</span>
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-cyan-700/50 hover:bg-cyan-900/30" onClick={handleDraw}>
+                  Draw
+                </Button>
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={handleShuffleDeck}>
+                  <Shuffle className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setGraveyardOpen('mine')}>
+                  <Flame className="h-3 w-3 mr-0.5 text-orange-400" />{organizedCards.my.graveyard.length}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setBanishedOpen('mine')}>
+                  <Ban className="h-3 w-3 mr-0.5 text-purple-400" />{organizedCards.my.banished.length}
+                </Button>
+              </div>
+            </div>
+
+            {/* My Hand */}
+            <div 
+              className="flex justify-center gap-1 py-2 px-4 rounded-lg mx-4"
+              style={{
+                background: 'linear-gradient(to top, rgba(0, 100, 150, 0.2), transparent)',
+              }}
+            >
+              {organizedCards.my.hand.map((card) => (
+                <DuelCard
+                  key={card.id}
+                  card={card}
+                  isOwner={true}
+                  size="md"
+                  className="hover:-translate-y-2 hover:z-10 transition-transform"
+                  onSummon={handleSummon}
+                  onSetSpell={handleSetSpell}
+                  onActivate={handleActivate}
+                  onActivateField={handleActivateField}
+                  onSendToGraveyard={() => handleSendToGraveyard(card)}
+                />
+              ))}
+              {organizedCards.my.hand.length === 0 && (
+                <div className="text-xs text-muted-foreground/50 py-4">Your hand is empty</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Zone selection overlay instruction */}
+        {selectingZone && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-green-600/90 text-white px-4 py-2 rounded-lg text-sm font-medium z-50 shadow-lg">
+            Select a {selectingZone} zone to place your card
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2 h-6 text-white hover:text-white hover:bg-green-700"
+              onClick={() => {
+                setPendingAction(null)
+                setSelectingZone(null)
+              }}
+            >
               Cancel
             </Button>
           </div>
-        </div>
-      )}
-
-      {/* Opponent's field (top) */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{opponentPlayer?.nickname || 'Opponent'}</span>
-          <Badge variant="outline" className="text-red-400 border-red-400/30">
-            LP: {opponentLifePoints}
-          </Badge>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs"
-            onClick={() => setGraveyardOpen('opponent')}
-          >
-            <Flame className="h-3 w-3 mr-1" />
-            GY ({organizedCards.opponent.graveyard.length})
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs"
-            onClick={() => setBanishedOpen('opponent')}
-          >
-            <Ban className="h-3 w-3 mr-1" />
-            Ban ({organizedCards.opponent.banished.length})
-          </Button>
-        </div>
-      </div>
-
-      {/* Opponent's hand (face-down) */}
-      <div className="flex justify-center gap-0.5">
-        {organizedCards.opponent.hand.map((card) => (
-          <DuelCard
-            key={card.id}
-            card={card}
-            isOwner={false}
-            size="sm"
-            showActions={false}
-          />
-        ))}
-        {organizedCards.opponent.hand.length === 0 && (
-          <div className="text-xs text-muted-foreground py-2">No cards in hand</div>
         )}
       </div>
 
-      {/* Opponent's spell/trap zones */}
-      {renderZoneRow(organizedCards.opponent.spellZones, 'spell', false, true)}
-
-      {/* Opponent's monster zones */}
-      {renderZoneRow(organizedCards.opponent.monsterZones, 'monster', false, true)}
-
-      {/* Center area: Field spells, decks, graveyards */}
-      <div className="flex justify-between items-center px-4 py-2">
-        {/* Opponent's extra deck & field spell */}
-        <div className="flex gap-1 items-center">
-          {organizedCards.opponent.fieldZone ? (
-            <DuelCard
-              card={organizedCards.opponent.fieldZone}
-              isOwner={false}
-              size="sm"
-              showActions={false}
-            />
-          ) : (
-            <EmptyZone type="field" size="sm" />
-          )}
-          <div className="relative">
-            <EmptyZone type="extra" size="sm" />
-            <span className="absolute bottom-0 right-0 text-[8px] bg-purple-600 text-white px-1 rounded">
-              {organizedCards.opponent.extraDeck.length}
-            </span>
-          </div>
-        </div>
-
-        {/* Divider with turn indicator */}
-        <div className="flex-1 mx-4 border-t border-border/30 relative">
-          <Badge 
-            className={cn(
-              "absolute left-1/2 -translate-x-1/2 -translate-y-1/2",
-              isMyTurn ? "bg-primary" : "bg-muted"
-            )}
-          >
-            {isMyTurn ? "Your Turn" : "Opponent's Turn"}
-          </Badge>
-        </div>
-
-        {/* Opponent's deck & graveyard */}
-        <div className="flex gap-1 items-center">
-          <div 
-            className="relative cursor-pointer"
-            onClick={() => setGraveyardOpen('opponent')}
-          >
-            {organizedCards.opponent.graveyard.length > 0 ? (
-              <DuelCard
-                card={organizedCards.opponent.graveyard[0]}
-                isOwner={false}
-                size="sm"
-                showActions={false}
-              />
-            ) : (
-              <EmptyZone type="graveyard" size="sm" />
-            )}
-            <span className="absolute bottom-0 right-0 text-[8px] bg-orange-600 text-white px-1 rounded">
-              {organizedCards.opponent.graveyard.length}
-            </span>
-          </div>
-          <div className="relative">
-            <EmptyZone type="deck" size="sm" />
-            <span className="absolute bottom-0 right-0 text-[8px] bg-blue-600 text-white px-1 rounded">
-              {organizedCards.opponent.deck.length}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* My monster zones */}
-      {renderZoneRow(organizedCards.my.monsterZones, 'monster', true)}
-
-      {/* My spell/trap zones */}
-      {renderZoneRow(organizedCards.my.spellZones, 'spell', true)}
-
-      {/* My extra stuff row */}
-      <div className="flex justify-between items-center px-4">
-        {/* My deck & graveyard */}
-        <div className="flex gap-1 items-center">
-          <div 
-            className="relative cursor-pointer hover:scale-105 transition-transform"
-            onClick={handleDraw}
-            title="Click to draw"
-          >
-            <EmptyZone type="deck" size="sm" />
-            <span className="absolute bottom-0 right-0 text-[8px] bg-blue-600 text-white px-1 rounded">
-              {organizedCards.my.deck.length}
-            </span>
-          </div>
-          <div 
-            className="relative cursor-pointer"
-            onClick={() => setGraveyardOpen('mine')}
-          >
-            {organizedCards.my.graveyard.length > 0 ? (
-              <DuelCard
-                card={organizedCards.my.graveyard[0]}
-                isOwner={true}
-                size="sm"
-                showActions={false}
-              />
-            ) : (
-              <EmptyZone type="graveyard" size="sm" />
-            )}
-            <span className="absolute bottom-0 right-0 text-[8px] bg-orange-600 text-white px-1 rounded">
-              {organizedCards.my.graveyard.length}
-            </span>
-          </div>
-        </div>
-
-        {/* Quick actions */}
-        <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 text-xs"
-            onClick={handleDraw}
-          >
-            Draw
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 text-xs"
-            onClick={handleShuffleDeck}
-          >
-            <Shuffle className="h-3 w-3" />
-          </Button>
-        </div>
-
-        {/* My field spell & extra deck */}
-        <div className="flex gap-1 items-center">
-          <div 
-            className="relative cursor-pointer"
-            onClick={() => setExtraDeckOpen(true)}
-          >
-            <EmptyZone type="extra" size="sm" />
-            <span className="absolute bottom-0 right-0 text-[8px] bg-purple-600 text-white px-1 rounded">
-              {organizedCards.my.extraDeck.length}
-            </span>
-          </div>
-          {organizedCards.my.fieldZone ? (
-            <DuelCard
-              card={organizedCards.my.fieldZone}
-              isOwner={true}
-              size="sm"
-              onSendToGraveyard={() => handleSendToGraveyard(organizedCards.my.fieldZone!)}
-            />
-          ) : (
-            <EmptyZone type="field" size="sm" />
-          )}
-        </div>
-      </div>
-
-      {/* My info bar */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{myPlayer.nickname}</span>
-          <Badge variant="outline" className="text-green-400 border-green-400/30">
-            LP: {myLifePoints}
-          </Badge>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs"
-            onClick={() => setGraveyardOpen('mine')}
-          >
-            <Flame className="h-3 w-3 mr-1" />
-            GY ({organizedCards.my.graveyard.length})
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs"
-            onClick={() => setBanishedOpen('mine')}
-          >
-            <Ban className="h-3 w-3 mr-1" />
-            Ban ({organizedCards.my.banished.length})
-          </Button>
-        </div>
-      </div>
-
-      {/* My hand */}
-      <div className="flex justify-center gap-1 pt-2 border-t border-border/30">
-        {organizedCards.my.hand.map((card) => (
-          <DuelCard
-            key={card.id}
-            card={card}
-            isOwner={true}
-            size="md"
-            selected={selectedCard?.id === card.id}
-            onClick={() => setSelectedCard(selectedCard?.id === card.id ? null : card)}
-            onSummon={(pos) => handleSummon(card, pos)}
-            onSetSpellTrap={() => handleSetSpellTrap(card)}
-            onActivate={() => handleActivate(card)}
-            onSendToGraveyard={() => handleSendToGraveyard(card)}
-            onBanish={(fd) => handleBanish(card, fd)}
-          />
-        ))}
-        {organizedCards.my.hand.length === 0 && (
-          <div className="text-xs text-muted-foreground py-4">No cards in hand - click your deck to draw</div>
-        )}
-      </div>
-
-      {/* Graveyard viewer dialog */}
+      {/* Graveyard Dialog */}
       <Dialog open={graveyardOpen !== null} onOpenChange={() => setGraveyardOpen(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-lg bg-slate-900 border-orange-700/50">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Flame className="h-5 w-5 text-orange-500" />
+            <DialogTitle className="flex items-center gap-2 text-orange-400">
+              <Flame className="h-5 w-5" />
               {graveyardOpen === 'mine' ? 'Your' : "Opponent's"} Graveyard
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="h-[400px]">
             <div className="grid grid-cols-4 gap-2 p-2">
               {(graveyardOpen === 'mine' ? organizedCards.my.graveyard : organizedCards.opponent.graveyard).map((card) => (
                 <DuelCard
                   key={card.id}
-                  card={card}
+                  card={{ ...card, position: 'face_up_attack' as CardPosition }}
                   isOwner={graveyardOpen === 'mine'}
                   size="md"
+                  showActions={graveyardOpen === 'mine'}
                   onReturnToHand={graveyardOpen === 'mine' ? () => handleReturnToHand(card) : undefined}
-                  onBanish={graveyardOpen === 'mine' ? (fd) => handleBanish(card, fd) : undefined}
-                  onReturnToDeck={graveyardOpen === 'mine' ? (top) => handleReturnToDeck(card, top) : undefined}
+                  onBanish={graveyardOpen === 'mine' ? () => handleBanish(card) : undefined}
                 />
               ))}
               {(graveyardOpen === 'mine' ? organizedCards.my.graveyard : organizedCards.opponent.graveyard).length === 0 && (
@@ -622,30 +637,30 @@ export function DuelField({
         </DialogContent>
       </Dialog>
 
-      {/* Banished viewer dialog */}
+      {/* Banished Dialog */}
       <Dialog open={banishedOpen !== null} onOpenChange={() => setBanishedOpen(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-lg bg-slate-900 border-purple-700/50">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Ban className="h-5 w-5 text-purple-500" />
-              {banishedOpen === 'mine' ? 'Your' : "Opponent's"} Banished Cards
+            <DialogTitle className="flex items-center gap-2 text-purple-400">
+              <Ban className="h-5 w-5" />
+              {banishedOpen === 'mine' ? 'Your' : "Opponent's"} Banished Zone
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="h-[400px]">
             <div className="grid grid-cols-4 gap-2 p-2">
               {(banishedOpen === 'mine' ? organizedCards.my.banished : organizedCards.opponent.banished).map((card) => (
                 <DuelCard
                   key={card.id}
-                  card={card}
+                  card={{ ...card, position: 'face_up_attack' as CardPosition }}
                   isOwner={banishedOpen === 'mine'}
                   size="md"
+                  showActions={banishedOpen === 'mine'}
                   onReturnToHand={banishedOpen === 'mine' ? () => handleReturnToHand(card) : undefined}
-                  onReturnToDeck={banishedOpen === 'mine' ? (top) => handleReturnToDeck(card, top) : undefined}
                 />
               ))}
               {(banishedOpen === 'mine' ? organizedCards.my.banished : organizedCards.opponent.banished).length === 0 && (
                 <div className="col-span-4 text-center text-muted-foreground py-8">
-                  No banished cards
+                  Banished zone is empty
                 </div>
               )}
             </div>
@@ -653,32 +668,29 @@ export function DuelField({
         </DialogContent>
       </Dialog>
 
-      {/* Extra deck viewer dialog */}
+      {/* Extra Deck Dialog */}
       <Dialog open={extraDeckOpen} onOpenChange={setExtraDeckOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-lg bg-slate-900 border-violet-700/50">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-purple-500" />
-              Extra Deck
+            <DialogTitle className="flex items-center gap-2 text-violet-400">
+              <Layers className="h-5 w-5" />
+              Your Extra Deck
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="h-[400px]">
             <div className="grid grid-cols-4 gap-2 p-2">
               {organizedCards.my.extraDeck.map((card) => (
                 <DuelCard
                   key={card.id}
-                  card={card}
+                  card={{ ...card, position: 'face_up_attack' as CardPosition }}
                   isOwner={true}
                   size="md"
-                  onClick={() => {
-                    setSelectedCard(card)
-                    // Could prompt for special summon zone selection here
-                  }}
+                  onSummon={handleSummon}
                 />
               ))}
               {organizedCards.my.extraDeck.length === 0 && (
                 <div className="col-span-4 text-center text-muted-foreground py-8">
-                  Extra deck is empty
+                  Extra Deck is empty
                 </div>
               )}
             </div>
