@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -41,8 +41,7 @@ import { PlayerCollection } from '@/components/player-collection'
 import { MVPCardDisplay } from '@/components/mvp-card-display'
 import { ProfileEditor } from '@/components/profile-editor'
 import { PROFILE_THEMES, YUGIOH_SERIES, CARD_MECHANICS, CARD_TYPES } from '@/lib/profile-themes'
-import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch, PlayerProfile as PlayerProfileType, UserProfile } from '@/lib/types'
-import type { User } from '@supabase/supabase-js'
+import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch, PlayerProfile as PlayerProfileType } from '@/lib/types'
 
 interface PlayerProfileProps {
   player: PlayerWithStats
@@ -246,34 +245,8 @@ function calculateTagTeamRecords(matches: MatchWithParticipants[], playerId: str
 export function PlayerProfile({ player, matches, allPlayers, savedMatches, profile }: PlayerProfileProps) {
   const [deleting, setDeleting] = useState(false)
   const [formatFilter, setFormatFilter] = useState<DeckFormat | 'all'>('all')
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const router = useRouter()
   const supabase = createClient()
-  
-  // Check if current user can edit this player
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setCurrentUser(user)
-      
-      if (user) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        setUserProfile(profile)
-      }
-    }
-    checkAuth()
-  }, [supabase])
-  
-  // User can edit if: they own this player OR they are an admin
-  const canEdit = currentUser && (
-    player.auth_user_id === currentUser.id || 
-    userProfile?.is_admin === true
-  )
   
   // Get theme config
   const theme = profile?.theme || 'kaiba'
@@ -563,10 +536,9 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                     Registered {new Date(player.created_at).toLocaleDateString()}
                   </p>
                   
-                  {/* Action Buttons - Only show if user can edit */}
-                  {canEdit && (
-                    <div className="flex gap-2 mt-2">
-                      <ProfileEditor 
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 mt-2">
+                    <ProfileEditor 
                         playerId={player.id}
                         profile={profile}
                         decks={player.decks}
@@ -604,7 +576,6 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
-                  )}
                   
                   {/* Favorites Row */}
                   {(profile?.favorite_series || profile?.favorite_mechanic || profile?.favorite_card_type) && (

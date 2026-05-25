@@ -7,14 +7,6 @@ export interface Player {
   updated_at: string
 }
 
-export interface UserProfile {
-  id: string
-  username: string
-  is_admin: boolean
-  created_at: string
-  updated_at: string
-}
-
 export type DeckFormat = 'tcg' | 'ocg' | 'casual'
 
 export interface Deck {
