@@ -172,6 +172,43 @@ export interface DuelRoomParticipant {
   spell_trap_zones: string
 }
 
+// YGOPro-style Duel Game Card Types
+export type CardLocation = 'deck' | 'hand' | 'monster_zone' | 'spell_zone' | 'field_zone' | 'graveyard' | 'banished' | 'extra_deck'
+export type CardPosition = 'face_up_attack' | 'face_up_defense' | 'face_down_defense' | 'face_down'
+export type DuelCardType = 'monster' | 'spell' | 'trap' | 'fusion' | 'synchro' | 'xyz' | 'link' | 'pendulum'
+
+export interface DuelGameCard {
+  id: string
+  room_id: string
+  player_id: string
+  card_name: string
+  card_id: number | null
+  card_type: DuelCardType
+  location: CardLocation
+  zone_index: number | null
+  position: CardPosition
+  attack: number | null
+  defense: number | null
+  level: number | null
+  attribute: string | null
+  counters: number
+  is_revealed: boolean
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DuelGameCardWithOwner extends DuelGameCard {
+  player: Player
+}
+
+export interface DuelFieldState {
+  playerCards: DuelGameCard[]
+  opponentCards: DuelGameCard[]
+  myPlayerId: string
+  opponentPlayerId: string
+}
+
 export interface DuelRoomEvent {
   id: string
   room_id: string

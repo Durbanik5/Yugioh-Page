@@ -21,7 +21,9 @@ import {
   Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw, ArrowLeftRight, UserCheck
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase } from '@/lib/types'
+import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase, DuelGameCard } from '@/lib/types'
+import { DuelField } from '@/components/duel/duel-field'
+import { initializeDuelDeck, drawCards, getDuelCards } from '@/lib/duel-actions'
 
 // Field Zone Card Types
 interface MonsterCard {
@@ -355,11 +357,23 @@ function DSoDLifePointDisplay({
 function SpectatorScreen({ 
   room, 
   duelists, 
-  currentTurnPlayer 
+  currentTurnPlayer,
+  showPlayField,
+  setShowPlayField,
+  selectedPlayer,
+  duelGameCards,
+  isDuelist,
+  fetchDuelGameCards,
 }: { 
   room: RoomData
   duelists: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
   currentTurnPlayer: (DuelRoomParticipant & { player: Player; deck: Deck | null }) | undefined
+  showPlayField: boolean
+  setShowPlayField: (value: boolean) => void
+  selectedPlayer: string
+  duelGameCards: DuelGameCard[]
+  isDuelist: boolean
+  fetchDuelGameCards: () => void
 }) {
   const phases: { key: TurnPhase; label: string }[] = [
     { key: 'draw', label: 'DP' },
@@ -473,6 +487,28 @@ function SpectatorScreen({
         </div>
       </div>
 
+      {/* View Mode Toggle - Top Right */}
+      <div className="absolute top-4 right-4 z-10">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowPlayField(!showPlayField)}
+          className="bg-slate-900/80 backdrop-blur-md border-cyan-500/50"
+        >
+          {showPlayField ? (
+            <>
+              <Eye className="h-4 w-4 mr-2" />
+              Classic View
+            </>
+          ) : (
+            <>
+              <Layers className="h-4 w-4 mr-2" />
+              Play Field
+            </>
+          )}
+        </Button>
+      </div>
+
       {/* Current Turn Player Indicator */}
       {currentTurnPlayer && (
         <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-lg border border-yellow-500/50 z-10">
@@ -486,7 +522,23 @@ function SpectatorScreen({
       )}
 
       {/* Duelists Display */}
-      {isFFA ? (
+      {showPlayField && room.status === 'active' && duelists.length === 2 && isDuelist ? (
+        // YGOPro-style Play Field
+        <div className="absolute inset-4 top-20 bottom-20 flex items-center justify-center z-10">
+          <DuelField
+            room={room}
+            myPlayerId={selectedPlayer}
+            opponentPlayerId={duelists.find(d => d.player_id !== selectedPlayer)?.player_id || null}
+            myPlayer={duelists.find(d => d.player_id === selectedPlayer)?.player || { id: '', nickname: 'You', avatar_url: null, auth_user_id: null, community_points: 0, created_at: '', updated_at: '' }}
+            opponentPlayer={duelists.find(d => d.player_id !== selectedPlayer)?.player || null}
+            allCards={duelGameCards}
+            myLifePoints={duelists.find(d => d.player_id === selectedPlayer)?.life_points || 8000}
+            opponentLifePoints={duelists.find(d => d.player_id !== selectedPlayer)?.life_points || 8000}
+            isMyTurn={room.current_turn_player_id === selectedPlayer}
+            onCardsChanged={fetchDuelGameCards}
+          />
+        </div>
+      ) : isFFA ? (
         // Circular layout for FFA with many participants
         <div className="absolute inset-0 flex items-center justify-center">
           {/* VS in center */}
@@ -622,6 +674,11 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   // Team management state (for tag team)
   const [teamManagementOpen, setTeamManagementOpen] = useState(false)
   
+  // YGOPro-style duel game cards
+  const [duelGameCards, setDuelGameCards] = useState<DuelGameCard[]>([])
+  const [deckInitialized, setDeckInitialized] = useState(false)
+  const [showPlayField, setShowPlayField] = useState(true) // Toggle between classic and play field modes
+  
   const chatEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -647,6 +704,9 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_room_messages', filter: `room_id=eq.${id}` }, () => {
         fetchMessages()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_game_cards', filter: `room_id=eq.${id}` }, () => {
+        fetchDuelGameCards()
       })
       .subscribe()
 
@@ -674,7 +734,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   }, [selectedPlayer])
 
   const fetchData = async () => {
-    await Promise.all([fetchRoom(), fetchEvents(), fetchMessages(), fetchPlayers()])
+    await Promise.all([fetchRoom(), fetchEvents(), fetchMessages(), fetchPlayers(), fetchDuelGameCards()])
     setLoading(false)
   }
 
@@ -695,6 +755,18 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     
     if (!error && data) {
       setRoom(data as RoomData)
+    }
+  }
+
+  const fetchDuelGameCards = async () => {
+    const { data, error } = await supabase
+      .from('duel_game_cards')
+      .select('*')
+      .eq('room_id', id)
+      .order('order_index', { ascending: true })
+    
+    if (!error && data) {
+      setDuelGameCards(data as DuelGameCard[])
     }
   }
 
@@ -799,12 +871,29 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       toast.info(`${toConvert.length} extra player(s) moved to spectators for 1v1`)
     }
 
-    // Set starting hand count to 5 for all duelists
+    const startingHandSize = room.starting_hand_size || 5
     const actualDuelists = room.match_type === '1v1' ? duelists.slice(0, 2) : duelists
+    
+    // Initialize decks for all duelists who have a deck selected
     for (const participant of actualDuelists) {
+      if (participant.deck_id) {
+        const initResult = await initializeDuelDeck(room.id, participant.player_id, participant.deck_id)
+        if (!initResult.success) {
+          toast.error(`Failed to initialize deck for ${participant.player.nickname}`)
+          return
+        }
+        
+        // Draw starting hand
+        const drawResult = await drawCards(room.id, participant.player_id, startingHandSize)
+        if (!drawResult.success) {
+          toast.error(`Failed to draw starting hand for ${participant.player.nickname}`)
+        }
+      }
+      
+      // Update hand count
       await supabase
         .from('duel_room_participants')
-        .update({ hand_count: 5 })
+        .update({ hand_count: startingHandSize })
         .eq('id', participant.id)
     }
 
@@ -822,10 +911,11 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     await supabase.from('duel_room_events').insert({
       room_id: id,
       event_type: 'game_start',
-      description: 'Duel started! Each player draws 5 cards.',
+      description: `Duel started! Each player draws ${startingHandSize} cards.`,
     })
 
     toast.success('Duel started!')
+    fetchDuelGameCards()
   }
 
   const handleEndDuel = async (winnerId?: string) => {
@@ -1676,7 +1766,17 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
         {/* Main Spectator Screen */}
         <div className="mb-6">
-          <SpectatorScreen room={room} duelists={duelists} currentTurnPlayer={currentTurnPlayer} />
+          <SpectatorScreen 
+                    room={room} 
+                    duelists={duelists} 
+                    currentTurnPlayer={currentTurnPlayer}
+                    showPlayField={showPlayField}
+                    setShowPlayField={setShowPlayField}
+                    selectedPlayer={selectedPlayer}
+                    duelGameCards={duelGameCards}
+                    isDuelist={isDuelist}
+                    fetchDuelGameCards={fetchDuelGameCards}
+                  />
         </div>
 
         {/* Stream Embed (if available) */}
