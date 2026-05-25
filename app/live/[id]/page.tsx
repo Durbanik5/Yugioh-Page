@@ -388,22 +388,56 @@ function SpectatorScreen({
     return (
       <div className="relative aspect-video bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-xl border-2 border-cyan-500/20 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
           <div className="text-center space-y-4">
             <div className="relative">
-              <Monitor className="h-20 w-20 mx-auto text-cyan-500/50 animate-pulse" />
+              <Monitor className="h-16 w-16 mx-auto text-cyan-500/50 animate-pulse" />
               <div className="absolute inset-0 blur-xl bg-cyan-500/20" />
             </div>
             <h2 className="text-2xl font-bold text-cyan-400" style={{ fontFamily: 'var(--font-orbitron)' }}>
               WAITING FOR DUELISTS
             </h2>
-            <p className="text-muted-foreground">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-muted-foreground">Room Code:</span>
+              <span className="font-mono text-xl text-cyan-400 font-bold tracking-wider">{room.room_code}</span>
+            </div>
+            
+            {/* Duelists Status */}
+            <div className="flex justify-center gap-8 mt-6">
+              {[0, 1].map((slot) => {
+                const duelist = duelists[slot]
+                return (
+                  <div key={slot} className="text-center p-4 rounded-lg border border-slate-700 bg-slate-900/50 min-w-[150px]">
+                    {duelist ? (
+                      <>
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 mx-auto mb-2 flex items-center justify-center text-white font-bold text-xl">
+                          {duelist.player.nickname.charAt(0).toUpperCase()}
+                        </div>
+                        <p className="font-semibold text-foreground">{duelist.player.nickname}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {duelist.deck ? (
+                            <span className="text-green-400">Deck: {duelist.deck.name}</span>
+                          ) : (
+                            <span className="text-yellow-400">No deck selected</span>
+                          )}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-600 mx-auto mb-2 flex items-center justify-center">
+                          <span className="text-slate-500 text-2xl">?</span>
+                        </div>
+                        <p className="text-muted-foreground">Waiting...</p>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <p className="text-muted-foreground text-sm mt-4">
               {duelists.length}/2 duelists joined
             </p>
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <span className="text-muted-foreground">Room Code:</span>
-              <span className="font-mono text-2xl text-cyan-400 font-bold tracking-wider">{room.room_code}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -653,6 +687,8 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [chatMessage, setChatMessage] = useState('')
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
   const [joinAsDuelist, setJoinAsDuelist] = useState(true)
+  const [deckChangeDialogOpen, setDeckChangeDialogOpen] = useState(false)
+  const [changingDeck, setChangingDeck] = useState('')
   const [selectedDeck, setSelectedDeck] = useState('')
   const [lpChangeAmount, setLpChangeAmount] = useState(1000)
   const [customEventText, setCustomEventText] = useState('')
@@ -925,6 +961,31 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
     toast.success('Duel started!')
     fetchDuelGameCards()
+  }
+
+  const handleChangeDeck = async () => {
+    if (!room || !changingDeck) return
+    
+    // Find the current user's participant entry
+    const myParticipant = room.participants.find(p => p.player_id === selectedPlayer)
+    if (!myParticipant) {
+      toast.error('You are not a participant in this duel')
+      return
+    }
+    
+    const { error } = await supabase
+      .from('duel_room_participants')
+      .update({ deck_id: changingDeck })
+      .eq('id', myParticipant.id)
+    
+    if (error) {
+      toast.error('Failed to change deck')
+      return
+    }
+    
+    toast.success('Deck changed!')
+    setDeckChangeDialogOpen(false)
+    fetchRoom()
   }
 
   const handleEndDuel = async (winnerId?: string) => {
@@ -1566,6 +1627,44 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                 <Play className="h-4 w-4 mr-2" />
                 Start Duel
               </Button>
+            )}
+
+            {/* Change Deck - Show for duelists in waiting room */}
+            {room.status === 'waiting' && isDuelist && (
+              <Dialog open={deckChangeDialogOpen} onOpenChange={setDeckChangeDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Layers className="h-4 w-4 mr-2" />
+                    Change Deck
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Select Your Deck</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <Select value={changingDeck} onValueChange={setChangingDeck}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a deck..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {playerDecks.length === 0 ? (
+                          <SelectItem value="none" disabled>No decks found</SelectItem>
+                        ) : (
+                          playerDecks.map((deck) => (
+                            <SelectItem key={deck.id} value={deck.id}>
+                              {deck.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleChangeDeck} className="w-full" disabled={!changingDeck}>
+                      Save Deck Selection
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
 
             {/* Team Management for Tag Team */}

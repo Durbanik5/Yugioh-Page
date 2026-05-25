@@ -44,6 +44,8 @@ export default function LiveDuelsPage() {
   const [firstTurnDraw, setFirstTurnDraw] = useState(false)
   const [shuffleDeck, setShuffleDeck] = useState(true)
   const [timePerTurn, setTimePerTurn] = useState<number | null>(null)
+  const [selectedDeck, setSelectedDeck] = useState('')
+  const [playerDecks, setPlayerDecks] = useState<{ id: string; name: string }[]>([])
 
   const supabase = createClient()
 
@@ -62,6 +64,28 @@ export default function LiveDuelsPage() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  // Fetch decks when player is selected
+  useEffect(() => {
+    const fetchPlayerDecks = async () => {
+      if (!selectedPlayer) {
+        setPlayerDecks([])
+        setSelectedDeck('')
+        return
+      }
+      
+      const { data, error } = await supabase
+        .from('decks')
+        .select('id, name')
+        .eq('player_id', selectedPlayer)
+        .order('name')
+      
+      if (!error && data) {
+        setPlayerDecks(data)
+      }
+    }
+    fetchPlayerDecks()
+  }, [selectedPlayer])
 
   const fetchData = async () => {
     await Promise.all([fetchPlayers(), fetchRooms()])
@@ -149,6 +173,7 @@ export default function LiveDuelsPage() {
     await supabase.from('duel_room_participants').insert({
       room_id: room.id,
       player_id: selectedPlayer,
+      deck_id: selectedDeck || null,
       is_spectator: false,
       life_points: startingLp,
       hand_count: startingHandSize,
@@ -222,7 +247,12 @@ export default function LiveDuelsPage() {
                   Create Room
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-card border-border">
+              <DialogContent 
+                className="bg-card border-border max-h-[90vh] overflow-y-auto"
+                onPointerDownOutside={(e) => e.preventDefault()}
+                onInteractOutside={(e) => e.preventDefault()}
+                onFocusOutside={(e) => e.preventDefault()}
+              >
                 <DialogHeader>
                   <DialogTitle className="text-foreground">Create Duel Room</DialogTitle>
                 </DialogHeader>
@@ -233,7 +263,7 @@ export default function LiveDuelsPage() {
                       <SelectTrigger className="bg-input border-border mt-1">
                         <SelectValue placeholder="Select yourself..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4}>
                         {players.map((player) => (
                           <SelectItem key={player.id} value={player.id}>
                             {player.nickname}
@@ -242,6 +272,31 @@ export default function LiveDuelsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {selectedPlayer && (
+                    <div>
+                      <Label className="text-muted-foreground">Your Deck</Label>
+                      <Select value={selectedDeck} onValueChange={setSelectedDeck}>
+                        <SelectTrigger className="bg-input border-border mt-1">
+                          <SelectValue placeholder="Select a deck..." />
+                        </SelectTrigger>
+                        <SelectContent position="popper" sideOffset={4}>
+                          {playerDecks.length === 0 ? (
+                            <SelectItem value="none" disabled>No decks found</SelectItem>
+                          ) : (
+                            playerDecks.map((deck) => (
+                              <SelectItem key={deck.id} value={deck.id}>
+                                {deck.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select a deck to use in this duel
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <Label className="text-muted-foreground">Room Name</Label>
@@ -259,7 +314,7 @@ export default function LiveDuelsPage() {
                       <SelectTrigger className="bg-input border-border mt-1">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4}>
                         <SelectItem value="1v1">1v1</SelectItem>
                         <SelectItem value="free_for_all">Free For All</SelectItem>
                         <SelectItem value="tag_team">Tag Team</SelectItem>
@@ -273,7 +328,7 @@ export default function LiveDuelsPage() {
                       <SelectTrigger className="bg-input border-border mt-1">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4}>
                         <SelectItem value="casual">
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -323,7 +378,7 @@ export default function LiveDuelsPage() {
                           <SelectTrigger className="bg-input border-border mt-1">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" sideOffset={4}>
                             <SelectItem value="8000">
                               <div className="flex items-center gap-2">
                                 <Heart className="h-3 w-3 text-red-500" />
@@ -358,7 +413,7 @@ export default function LiveDuelsPage() {
                           <SelectTrigger className="bg-input border-border mt-1">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" sideOffset={4}>
                             <SelectItem value="5">5 Cards</SelectItem>
                             <SelectItem value="6">6 Cards</SelectItem>
                           </SelectContent>
@@ -373,7 +428,7 @@ export default function LiveDuelsPage() {
                           <SelectTrigger className="bg-input border-border mt-1">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" sideOffset={4}>
                             <SelectItem value="MR5">MR5 (2020)</SelectItem>
                             <SelectItem value="MR4">MR4 (Link)</SelectItem>
                             <SelectItem value="MR3">MR3 (Pendulum)</SelectItem>
@@ -387,7 +442,7 @@ export default function LiveDuelsPage() {
                           <SelectTrigger className="bg-input border-border mt-1">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" sideOffset={4}>
                             <SelectItem value="none">
                               <div className="flex items-center gap-2">
                                 <Timer className="h-3 w-3 text-muted-foreground" />
