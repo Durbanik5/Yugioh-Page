@@ -192,6 +192,7 @@ export interface DuelGameCard {
   defense: number | null
   level: number | null
   attribute: string | null
+  effect_text: string | null
   counters: number
   is_revealed: boolean
   has_attacked: boolean
