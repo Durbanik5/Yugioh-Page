@@ -7,5 +7,24 @@ export { GameStateManager, getGameStateManager, clearGameStateManager } from './
 export { RuleValidator } from './rule-validator'
 export { ActionExecutor, actionExecutor } from './action-executor'
 
+// Game processor - the core game loop based on ygopro-core architecture
+export { 
+  GameProcessor, 
+  getGameProcessor, 
+  clearGameProcessor,
+  ProcessorType,
+  GameEvent,
+  Reason,
+  Phase,
+  Location,
+} from './game-processor'
+export type { 
+  ProcessorUnit, 
+  GameEventData, 
+  ChainLink, 
+  PlayerState, 
+  FieldState 
+} from './game-processor'
+
 // Card scripting system - data-driven effect definitions
 export * from './card-scripts'

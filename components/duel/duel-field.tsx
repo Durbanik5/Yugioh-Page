@@ -75,6 +75,15 @@ export function DuelField({
     executeSpellTrapActivation,
     setSpellTrap: engineSetSpellTrap,
     changePhase,
+    // New battle actions
+    myFieldMonsters,
+    opponentFieldMonsters,
+    validateAttack,
+    executeAttack,
+    enterBattlePhase,
+    enterMain2,
+    flipSummon: engineFlipSummon,
+    changeMonsterPosition,
   } = useDuelEngine({ room, myPlayerId, allCards, onCardsChanged })
 
   const [selectedCard, setSelectedCard] = useState<DuelGameCard | null>(null)
@@ -95,6 +104,10 @@ export function DuelField({
     activatingPlayerId: string
   } | null>(null)
   const [activatingCard, setActivatingCard] = useState<DuelGameCard | null>(null)
+  
+  // Attack state
+  const [attackingCard, setAttackingCard] = useState<DuelGameCard | null>(null)
+  const [isSelectingAttackTarget, setIsSelectingAttackTarget] = useState(false)
 
   // Organize cards by location and player
   const organizedCards = useMemo(() => {
@@ -308,6 +321,42 @@ export function DuelField({
     setChainPrompt(null)
   }, [])
 
+  // Handle attack initiation
+  const handleAttack = useCallback((attacker: DuelGameCard) => {
+    // Validate attack first
+    const validation = validateAttack(attacker)
+    if (!validation.valid) {
+      toast.error(validation.reason)
+      return
+    }
+    
+    // If opponent has no monsters, do direct attack
+    if (opponentFieldMonsters.length === 0) {
+      executeAttack(attacker)
+      return
+    }
+    
+    // Otherwise, select attack target
+    setAttackingCard(attacker)
+    setIsSelectingAttackTarget(true)
+    toast.info('Select a monster to attack')
+  }, [validateAttack, executeAttack, opponentFieldMonsters])
+
+  // Handle attack target selection
+  const handleSelectAttackTarget = useCallback((target: DuelGameCard) => {
+    if (!attackingCard) return
+    
+    executeAttack(attackingCard, target)
+    setAttackingCard(null)
+    setIsSelectingAttackTarget(false)
+  }, [attackingCard, executeAttack])
+
+  // Cancel attack
+  const cancelAttack = useCallback(() => {
+    setAttackingCard(null)
+    setIsSelectingAttackTarget(false)
+  }, [])
+
   // Card zone dimensions
   const cardWidth = 'w-16'
   const cardHeight = 'h-24'
@@ -342,18 +391,30 @@ export function DuelField({
     }
 
     if (card) {
+      // Check if this card is a valid attack target
+      const isAttackTarget = isSelectingAttackTarget && !isOwner && type === 'monster'
+      // Check if this card can attack (is my monster in attack position during battle phase)
+      const canAttack = isOwner && type === 'monster' && 
+        gameState?.phase === 'battle' && 
+        card.position === 'face_up_attack' && 
+        !card.has_attacked
+      
       return (
         <DuelCard
           key={card.id}
           card={card}
           isOwner={isOwner}
           size="md"
+          isAttackTarget={isAttackTarget}
+          canAttack={canAttack}
+          onClick={isAttackTarget ? () => handleSelectAttackTarget(card) : undefined}
           onSummon={(position) => handleSummon(card, position)}
           onSetSpellTrap={() => handleSetSpell(card)}
           onActivate={() => handleActivate(card)}
           onActivateField={() => handleActivateField(card)}
           onFlip={() => handleFlip(card)}
           onChangePosition={(pos) => handleChangePosition(card, pos)}
+          onAttack={canAttack ? () => handleAttack(card) : undefined}
         />
       )
     }
@@ -555,6 +616,53 @@ export function DuelField({
                   battlePhaseEnabled={gameState.battlePhaseEnabled}
                 />
               </div>
+            )}
+            
+            {/* Attack Controls - shown when selecting attack target */}
+            {isSelectingAttackTarget && attackingCard && (
+              <div className="absolute right-4 flex items-center gap-2">
+                <Badge variant="destructive" className="animate-pulse">
+                  {attackingCard.card_name} is attacking
+                </Badge>
+                {opponentFieldMonsters.length === 0 && (
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    onClick={() => {
+                      executeAttack(attackingCard)
+                      setAttackingCard(null)
+                      setIsSelectingAttackTarget(false)
+                    }}
+                  >
+                    Direct Attack!
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={cancelAttack}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+            
+            {/* Battle Phase Controls */}
+            {engineIsMyTurn && gameState?.phase === 'main1' && gameState.turnCount > 1 && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="absolute right-4"
+                onClick={enterBattlePhase}
+              >
+                Enter Battle Phase
+              </Button>
+            )}
+            {engineIsMyTurn && gameState?.phase === 'battle' && !isSelectingAttackTarget && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="absolute right-4"
+                onClick={enterMain2}
+              >
+                End Battle Phase
+              </Button>
             )}
           </div>
 

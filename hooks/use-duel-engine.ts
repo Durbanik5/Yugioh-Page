@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { DuelEngine } from '@/lib/duel-engine'
 import type { GameState, DuelPhase, ChainLink } from '@/lib/duel-engine/types'
-import type { DuelGameCard, DuelRoom, Player } from '@/lib/types'
+import type { DuelGameCard, DuelRoom, Player, CardPosition } from '@/lib/types'
 import { toast } from 'sonner'
 
 interface UseDuelEngineProps {
@@ -19,6 +19,17 @@ interface ValidationResult {
   reason?: string
   requiresTributes?: number
   tributeTargets?: DuelGameCard[]
+}
+
+interface AttackResult {
+  success: boolean
+  error?: string
+  battleResult?: {
+    attackerDestroyed: boolean
+    defenderDestroyed: boolean
+    damageDealt: number
+    damageToWho: 'attacker' | 'defender' | 'both' | 'none'
+  }
 }
 
 export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: UseDuelEngineProps) {
@@ -563,11 +574,403 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     onCardsChanged()
   }, [isMyTurn, gameState, room, myPlayerId, allCards, supabase, onCardsChanged])
 
+  // Get opponent field monsters
+  const opponentFieldMonsters = useMemo(() => {
+    const participants = room.duel_room_participants || []
+    const opponent = participants.find(p => p.player_id !== myPlayerId)
+    if (!opponent) return []
+    return allCards.filter(
+      c => c.player_id === opponent.player_id && c.location === 'monster_zone'
+    )
+  }, [allCards, room.duel_room_participants, myPlayerId])
+
+  // Validate attack
+  const validateAttack = useCallback((attacker: DuelGameCard, target?: DuelGameCard): ValidationResult => {
+    if (!gameState) {
+      return { valid: false, reason: 'Game not initialized' }
+    }
+
+    if (!isMyTurn) {
+      return { valid: false, reason: "It's not your turn" }
+    }
+
+    if (gameState.phase !== 'battle') {
+      return { valid: false, reason: 'You can only attack during Battle Phase' }
+    }
+
+    // Check if attacker can attack
+    if (attacker.position?.includes('defense')) {
+      return { valid: false, reason: 'Defense position monsters cannot attack' }
+    }
+
+    if (attacker.has_attacked) {
+      return { valid: false, reason: 'This monster already attacked this turn' }
+    }
+
+    // Monsters cannot attack the turn they are summoned (except with effects)
+    if (attacker.turn_summoned === gameState.turnCount && gameState.turnCount > 1) {
+      return { valid: false, reason: 'This monster cannot attack the turn it was summoned' }
+    }
+
+    // If opponent has monsters, must attack a monster (unless direct attack allowed)
+    if (!target && opponentFieldMonsters.length > 0) {
+      return { valid: false, reason: 'You must attack a monster when your opponent controls one' }
+    }
+
+    return { valid: true }
+  }, [gameState, isMyTurn, opponentFieldMonsters])
+
+  // Execute attack
+  const executeAttack = useCallback(async (
+    attacker: DuelGameCard,
+    target?: DuelGameCard
+  ): Promise<AttackResult> => {
+    const validation = validateAttack(attacker, target)
+    if (!validation.valid) {
+      toast.error(validation.reason)
+      return { success: false, error: validation.reason }
+    }
+
+    const attackerATK = attacker.attack || 0
+    
+    // Mark attacker as having attacked
+    await supabase
+      .from('duel_game_cards')
+      .update({ has_attacked: true })
+      .eq('id', attacker.id)
+
+    // Direct attack
+    if (!target) {
+      const participants = room.duel_room_participants || []
+      const opponent = participants.find(p => p.player_id !== myPlayerId)
+      
+      if (opponent) {
+        const newLP = Math.max(0, (opponent.life_points || 8000) - attackerATK)
+        await supabase
+          .from('duel_room_participants')
+          .update({ life_points: newLP })
+          .eq('id', opponent.id)
+
+        toast.success(`Direct attack! ${attacker.card_name} deals ${attackerATK} damage!`)
+        
+        if (newLP <= 0) {
+          toast.success('You win! Opponent\'s LP reached 0!')
+          await supabase
+            .from('duel_rooms')
+            .update({ 
+              status: 'completed',
+              winner_id: myPlayerId
+            })
+            .eq('id', room.id)
+        }
+        
+        onCardsChanged()
+        return { 
+          success: true, 
+          battleResult: {
+            attackerDestroyed: false,
+            defenderDestroyed: false,
+            damageDealt: attackerATK,
+            damageToWho: 'defender'
+          }
+        }
+      }
+      return { success: false, error: 'No opponent found' }
+    }
+
+    // Battle calculation
+    const defenderIsAttack = target.position === 'face_up_attack'
+    const defenderValue = defenderIsAttack ? (target.attack || 0) : (target.defense || 0)
+    
+    // Flip face-down monsters
+    if (target.position === 'face_down_defense') {
+      await supabase
+        .from('duel_game_cards')
+        .update({ position: 'face_up_defense' })
+        .eq('id', target.id)
+      toast.info(`${target.card_name} was flipped face-up!`)
+    }
+
+    const participants = room.duel_room_participants || []
+    const opponent = participants.find(p => p.player_id !== myPlayerId)
+    const me = participants.find(p => p.player_id === myPlayerId)
+
+    let result: AttackResult['battleResult'] = {
+      attackerDestroyed: false,
+      defenderDestroyed: false,
+      damageDealt: 0,
+      damageToWho: 'none'
+    }
+
+    if (defenderIsAttack) {
+      // ATK vs ATK
+      if (attackerATK > defenderValue) {
+        // Attacker wins
+        result.damageDealt = attackerATK - defenderValue
+        result.damageToWho = 'defender'
+        result.defenderDestroyed = true
+
+        // Send defender to GY
+        await supabase
+          .from('duel_game_cards')
+          .update({ location: 'graveyard', zone_index: null })
+          .eq('id', target.id)
+
+        // Deal damage to opponent
+        if (opponent) {
+          const newLP = Math.max(0, (opponent.life_points || 8000) - result.damageDealt)
+          await supabase
+            .from('duel_room_participants')
+            .update({ life_points: newLP })
+            .eq('id', opponent.id)
+          
+          if (newLP <= 0) {
+            toast.success('You win! Opponent\'s LP reached 0!')
+            await supabase
+              .from('duel_rooms')
+              .update({ status: 'completed', winner_id: myPlayerId })
+              .eq('id', room.id)
+          }
+        }
+
+        toast.success(`${attacker.card_name} destroyed ${target.card_name}! ${result.damageDealt} damage!`)
+
+      } else if (attackerATK < defenderValue) {
+        // Defender wins
+        result.damageDealt = defenderValue - attackerATK
+        result.damageToWho = 'attacker'
+        result.attackerDestroyed = true
+
+        // Send attacker to GY
+        await supabase
+          .from('duel_game_cards')
+          .update({ location: 'graveyard', zone_index: null })
+          .eq('id', attacker.id)
+
+        // Deal damage to self
+        if (me) {
+          const newLP = Math.max(0, (me.life_points || 8000) - result.damageDealt)
+          await supabase
+            .from('duel_room_participants')
+            .update({ life_points: newLP })
+            .eq('id', me.id)
+          
+          if (newLP <= 0) {
+            toast.error('You lose! Your LP reached 0!')
+            await supabase
+              .from('duel_rooms')
+              .update({ status: 'completed', winner_id: opponent?.player_id })
+              .eq('id', room.id)
+          }
+        }
+
+        toast.error(`${attacker.card_name} was destroyed by ${target.card_name}! You take ${result.damageDealt} damage!`)
+
+      } else {
+        // Tie - both destroyed
+        result.attackerDestroyed = true
+        result.defenderDestroyed = true
+        result.damageToWho = 'both'
+
+        await supabase
+          .from('duel_game_cards')
+          .update({ location: 'graveyard', zone_index: null })
+          .in('id', [attacker.id, target.id])
+
+        toast.info(`Both ${attacker.card_name} and ${target.card_name} were destroyed!`)
+      }
+    } else {
+      // ATK vs DEF
+      if (attackerATK > defenderValue) {
+        // Attacker wins, no damage
+        result.defenderDestroyed = true
+
+        await supabase
+          .from('duel_game_cards')
+          .update({ location: 'graveyard', zone_index: null })
+          .eq('id', target.id)
+
+        toast.success(`${attacker.card_name} destroyed ${target.card_name}!`)
+
+      } else if (attackerATK < defenderValue) {
+        // Defender wins, attacker takes damage
+        result.damageDealt = defenderValue - attackerATK
+        result.damageToWho = 'attacker'
+
+        if (me) {
+          const newLP = Math.max(0, (me.life_points || 8000) - result.damageDealt)
+          await supabase
+            .from('duel_room_participants')
+            .update({ life_points: newLP })
+            .eq('id', me.id)
+          
+          if (newLP <= 0) {
+            toast.error('You lose! Your LP reached 0!')
+            await supabase
+              .from('duel_rooms')
+              .update({ status: 'completed', winner_id: opponent?.player_id })
+              .eq('id', room.id)
+          }
+        }
+
+        toast.error(`${attacker.card_name} crashed into ${target.card_name}'s defense! You take ${result.damageDealt} damage!`)
+
+      } else {
+        // Tie - nothing happens
+        toast.info(`${attacker.card_name}'s attack was blocked by ${target.card_name}!`)
+      }
+    }
+
+    onCardsChanged()
+    return { success: true, battleResult: result }
+  }, [validateAttack, supabase, room, myPlayerId, onCardsChanged])
+
+  // Flip summon
+  const flipSummon = useCallback(async (card: DuelGameCard): Promise<{ success: boolean; error?: string }> => {
+    if (!gameState) {
+      return { success: false, error: 'Game not initialized' }
+    }
+
+    if (!isMyTurn) {
+      return { success: false, error: "It's not your turn" }
+    }
+
+    if (gameState.phase !== 'main1' && gameState.phase !== 'main2') {
+      return { success: false, error: 'Can only Flip Summon during Main Phase' }
+    }
+
+    if (card.position !== 'face_down_defense') {
+      return { success: false, error: 'Can only Flip Summon face-down Defense position monsters' }
+    }
+
+    if (card.turn_set === gameState.turnCount) {
+      return { success: false, error: 'Cannot Flip Summon a monster the turn it was Set' }
+    }
+
+    if (card.has_changed_position) {
+      return { success: false, error: 'This monster already changed position this turn' }
+    }
+
+    const { error } = await supabase
+      .from('duel_game_cards')
+      .update({ 
+        position: 'face_up_attack',
+        has_changed_position: true
+      })
+      .eq('id', card.id)
+
+    if (error) {
+      return { success: false, error: 'Database error' }
+    }
+
+    toast.success(`Flip Summoned ${card.card_name}!`)
+    onCardsChanged()
+    return { success: true }
+  }, [gameState, isMyTurn, supabase, onCardsChanged])
+
+  // Change monster position
+  const changeMonsterPosition = useCallback(async (
+    card: DuelGameCard, 
+    newPosition: CardPosition
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!gameState) {
+      return { success: false, error: 'Game not initialized' }
+    }
+
+    if (!isMyTurn) {
+      return { success: false, error: "It's not your turn" }
+    }
+
+    if (gameState.phase !== 'main1' && gameState.phase !== 'main2') {
+      return { success: false, error: 'Can only change position during Main Phase' }
+    }
+
+    if (card.turn_summoned === gameState.turnCount) {
+      return { success: false, error: 'Cannot change position of a monster summoned this turn' }
+    }
+
+    if (card.has_changed_position) {
+      return { success: false, error: 'This monster already changed position this turn' }
+    }
+
+    if (card.has_attacked) {
+      return { success: false, error: 'Cannot change position of a monster that attacked this turn' }
+    }
+
+    const { error } = await supabase
+      .from('duel_game_cards')
+      .update({ 
+        position: newPosition,
+        has_changed_position: true
+      })
+      .eq('id', card.id)
+
+    if (error) {
+      return { success: false, error: 'Database error' }
+    }
+
+    toast.success(`Changed ${card.card_name} to ${newPosition.replace(/_/g, ' ')}`)
+    onCardsChanged()
+    return { success: true }
+  }, [gameState, isMyTurn, supabase, onCardsChanged])
+
+  // Enter battle phase
+  const enterBattlePhase = useCallback(async () => {
+    if (!isMyTurn) {
+      toast.error("It's not your turn")
+      return
+    }
+
+    if (gameState?.phase !== 'main1') {
+      toast.error('Can only enter Battle Phase from Main Phase 1')
+      return
+    }
+
+    // First turn player cannot enter battle phase
+    if (gameState.turnCount === 1) {
+      toast.error('Cannot enter Battle Phase on the first turn')
+      return
+    }
+
+    await supabase
+      .from('duel_game_state')
+      .update({ phase: 'battle' })
+      .eq('room_id', room.id)
+
+    setGameState(prev => prev ? { ...prev, phase: 'battle' } : null)
+    toast.info('Entered Battle Phase')
+  }, [isMyTurn, gameState, supabase, room.id])
+
+  // Enter main phase 2
+  const enterMain2 = useCallback(async () => {
+    if (!isMyTurn) {
+      toast.error("It's not your turn")
+      return
+    }
+
+    if (gameState?.phase !== 'battle') {
+      toast.error('Can only enter Main Phase 2 from Battle Phase')
+      return
+    }
+
+    await supabase
+      .from('duel_game_state')
+      .update({ phase: 'main2' })
+      .eq('room_id', room.id)
+
+    setGameState(prev => prev ? { ...prev, phase: 'main2' } : null)
+    toast.info('Entered Main Phase 2')
+  }, [isMyTurn, gameState, supabase, room.id])
+
   return {
     gameState,
     isLoading,
     isMyTurn,
     hasNormalSummoned,
+    
+    // Field info
+    myFieldMonsters,
+    opponentFieldMonsters,
     
     // Tribute summon state
     pendingTributeAction,
@@ -583,5 +986,15 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     executeSpellTrapActivation,
     setSpellTrap,
     changePhase,
+    
+    // Battle actions
+    validateAttack,
+    executeAttack,
+    enterBattlePhase,
+    enterMain2,
+    
+    // Position actions
+    flipSummon,
+    changeMonsterPosition,
   }
 }

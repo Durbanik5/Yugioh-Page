@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { 
   Sword, Shield, Flame, RotateCcw,
-  Eye, EyeOff, Plus, Minus, ChevronRight
+  Eye, EyeOff, Plus, Minus, ChevronRight, Crosshair
 } from 'lucide-react'
 import type { DuelGameCard, CardPosition } from '@/lib/types'
 
@@ -27,6 +27,7 @@ interface DuelCardProps {
   onActivate?: () => void
   onFlip?: () => void
   onChangePosition?: (position: CardPosition) => void
+  onAttack?: () => void  // New attack action
   onSendToGraveyard?: () => void
   onBanish?: (faceDown?: boolean) => void
   onAddCounter?: () => void
@@ -34,6 +35,8 @@ interface DuelCardProps {
   onHover?: (card: DuelGameCard | null) => void
   disabled?: boolean
   selected?: boolean
+  isAttackTarget?: boolean  // Highlight as valid attack target
+  canAttack?: boolean  // Whether this monster can currently attack
   showActions?: boolean
   className?: string
 }
@@ -55,6 +58,7 @@ export function DuelCard({
   onActivate,
   onFlip,
   onChangePosition,
+  onAttack,
   onSendToGraveyard,
   onBanish,
   onAddCounter,
@@ -62,6 +66,8 @@ export function DuelCard({
   onHover,
   disabled = false,
   selected = false,
+  isAttackTarget = false,
+  canAttack = false,
   showActions = true,
   className,
 }: DuelCardProps) {
@@ -103,6 +109,8 @@ export function DuelCard({
         sizeClasses[size],
         isDefensePosition && card.location === 'monster_zone' && 'rotate-90',
         selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        isAttackTarget && 'ring-2 ring-red-500 ring-offset-2 ring-offset-background animate-pulse',
+        canAttack && 'ring-2 ring-green-500/50',
         disabled && 'opacity-50 cursor-not-allowed',
         !disabled && 'hover:scale-105 hover:z-10',
         className
@@ -250,6 +258,19 @@ export function DuelCard({
         {/* Field actions for monsters */}
         {card.location === 'monster_zone' && (
           <div className="space-y-0.5">
+            {/* Attack action - only for face-up attack position monsters that can attack */}
+            {!isFaceDown && card.position === 'face_up_attack' && onAttack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                onClick={() => handleAction(onAttack)}
+                disabled={card.has_attacked}
+              >
+                <Crosshair className="mr-2 h-3.5 w-3.5" />
+                {card.has_attacked ? 'Already Attacked' : 'Attack'}
+              </Button>
+            )}
             {isFaceDown && onFlip && (
               <Button
                 variant="ghost"
