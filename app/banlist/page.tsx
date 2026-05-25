@@ -555,7 +555,7 @@ export default function BanlistPage() {
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredOfficialBanlist.map((card) => (
-                  <Card key={card.id} className="bg-card border-border overflow-hidden">
+                  <Card key={card.id} className="bg-card border-border overflow-hidden group hover:border-primary/50 transition-colors">
                     <CardContent className="p-3">
                       <div className="flex gap-3">
                         {card.card_images[0] && (
@@ -564,20 +564,33 @@ export default function BanlistPage() {
                             alt={card.name}
                             width={50}
                             height={73}
-                            className="rounded"
+                            className="rounded flex-shrink-0"
                           />
                         )}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-sm text-foreground truncate">{card.name}</h3>
                           <p className="text-xs text-muted-foreground truncate">{card.type}</p>
+                          {(card.atk !== undefined || card.def !== undefined) && (
+                            <p className="text-xs text-muted-foreground">
+                              {card.atk !== undefined && `ATK/${card.atk}`}
+                              {card.atk !== undefined && card.def !== undefined && ' '}
+                              {card.def !== undefined && `DEF/${card.def}`}
+                            </p>
+                          )}
                           <Badge 
                             variant="outline" 
-                            className={`mt-2 text-xs ${getBanStatusColor(card.banStatus)}`}
+                            className={`mt-1 text-xs ${getBanStatusColor(card.banStatus)}`}
                           >
                             {getBanStatusIcon(card.banStatus)}
                             <span className="ml-1">{card.banStatus}</span>
                           </Badge>
                         </div>
+                      </div>
+                      {/* Card Effect */}
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4 group-hover:line-clamp-none transition-all">
+                          {card.desc}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
