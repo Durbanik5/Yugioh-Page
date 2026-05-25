@@ -894,6 +894,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
     toast.success(actualJoinAsDuelist ? 'Joined as duelist!' : 'Joined as spectator!')
     setJoinDialogOpen(false)
+    fetchRoom() // Refresh room data to show the new participant
   }
 
   const handleStartDuel = async () => {
@@ -919,6 +920,13 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     const startingHandSize = room.starting_hand_size || 5
     const actualDuelists = room.match_type === '1v1' ? duelists.slice(0, 2) : duelists
     
+    // Check if at least one duelist has a deck
+    const duelistsWithDecks = actualDuelists.filter(d => d.deck_id)
+    if (duelistsWithDecks.length === 0) {
+      toast.error('At least one duelist must have a deck selected to start the duel')
+      return
+    }
+
     // Initialize decks for all duelists who have a deck selected
     for (const participant of actualDuelists) {
       if (participant.deck_id) {
@@ -960,6 +968,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
     })
 
     toast.success('Duel started!')
+    await fetchRoom() // Refresh room to show active state
     fetchDuelGameCards()
   }
 
@@ -1524,13 +1533,20 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
                             <SelectValue placeholder="Choose a deck..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {playerDecks.map((deck) => (
-                              <SelectItem key={deck.id} value={deck.id}>
-                                {deck.name}
-                              </SelectItem>
-                            ))}
+                            {playerDecks.length === 0 ? (
+                              <SelectItem value="none" disabled>No decks found - create one first</SelectItem>
+                            ) : (
+                              playerDecks.map((deck) => (
+                                <SelectItem key={deck.id} value={deck.id}>
+                                  {deck.name}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
+                        <p className="text-xs text-muted-foreground">
+                          You can also change your deck before the duel starts
+                        </p>
                       </div>
                     )}
                     <Button onClick={handleJoinRoom} className="w-full">
