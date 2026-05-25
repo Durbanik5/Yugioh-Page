@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper } from 'lucide-react'
+import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen } from 'lucide-react'
 
 export function Header() {
   return (
@@ -63,6 +63,17 @@ export function Header() {
               <Newspaper className="h-4 w-4" />
               <span className="hidden sm:inline">News</span>
             </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <a 
+              href="https://img.yugioh-card.com/en/downloads/rulebook/SD_RuleBook_EN_10.pdf" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2"
+            >
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">Rules</span>
+            </a>
           </Button>
         </nav>
       </div>

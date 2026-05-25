@@ -680,3 +680,677 @@ export async function millCards(
 
   return { success: true, milledCards: deckCards as DuelGameCard[] }
 }
+
+// ==========================================
+// TURN STRUCTURE & PHASE MANAGEMENT
+// Based on Official Yu-Gi-Oh! Rulebook v10
+// ==========================================
+
+const PHASE_ORDER: CardLocation[] = ['draw', 'standby', 'main', 'battle', 'main2', 'end'] as unknown as CardLocation[]
+
+// Advance to the next phase
+export async function advancePhase(
+  roomId: string,
+  playerId: string
+): Promise<{ success: boolean; newPhase?: string; drawnCard?: DuelGameCard; error?: string }> {
+  const supabase = await createClient()
+  
+  // Get current room state
+  const { data: room, error: roomError } = await supabase
+    .from('duel_rooms')
+    .select('*, participants:duel_room_participants(*)')
+    .eq('id', roomId)
+    .single()
+  
+  if (roomError || !room) {
+    return { success: false, error: 'Room not found' }
+  }
+  
+  // Only current turn player can advance phase
+  if (room.current_turn !== playerId) {
+    return { success: false, error: 'Not your turn' }
+  }
+  
+  const currentPhase = room.turn_phase || 'draw'
+  const currentIndex = (PHASE_ORDER as unknown as string[]).indexOf(currentPhase)
+  
+  // Determine next phase
+  let nextPhase: string
+  let drawnCard: DuelGameCard | undefined
+  
+  if (currentIndex >= PHASE_ORDER.length - 1 || currentPhase === 'end') {
+    // End Phase -> Next turn's Draw Phase
+    nextPhase = 'draw'
+  } else {
+    nextPhase = (PHASE_ORDER as unknown as string[])[currentIndex + 1]
+  }
+  
+  // Skip Battle Phase on turn 1 (official rule)
+  if (nextPhase === 'battle' && room.turn_count === 1) {
+    nextPhase = 'main2'
+  }
+  
+  // Auto-draw card when entering Draw Phase (except turn 1 for first player if first_turn_draw is false)
+  if (nextPhase === 'draw') {
+    const shouldDraw = room.turn_count > 1 || room.first_turn_draw
+    if (shouldDraw) {
+      const drawResult = await drawCards(roomId, playerId, 1)
+      if (drawResult.success && drawResult.drawnCards?.[0]) {
+        drawnCard = drawResult.drawnCards[0]
+      }
+    }
+  }
+  
+  // Update room phase
+  const { error: updateError } = await supabase
+    .from('duel_rooms')
+    .update({ turn_phase: nextPhase })
+    .eq('id', roomId)
+  
+  if (updateError) {
+    return { success: false, error: 'Failed to advance phase' }
+  }
+  
+  return { success: true, newPhase: nextPhase, drawnCard }
+}
+
+// End turn and pass to opponent
+export async function endTurn(
+  roomId: string,
+  playerId: string
+): Promise<{ success: boolean; nextPlayer?: string; error?: string }> {
+  const supabase = await createClient()
+  
+  // Get current room state
+  const { data: room, error: roomError } = await supabase
+    .from('duel_rooms')
+    .select('*, participants:duel_room_participants(player_id, is_spectator)')
+    .eq('id', roomId)
+    .single()
+  
+  if (roomError || !room) {
+    return { success: false, error: 'Room not found' }
+  }
+  
+  // Only current turn player can end turn
+  if (room.current_turn !== playerId) {
+    return { success: false, error: 'Not your turn' }
+  }
+  
+  // Find the duelists (non-spectators)
+  const duelists = room.participants.filter((p: { is_spectator: boolean }) => !p.is_spectator)
+  if (duelists.length < 2) {
+    return { success: false, error: 'Not enough duelists' }
+  }
+  
+  // Find next player
+  const nextPlayer = duelists.find((p: { player_id: string }) => p.player_id !== playerId)?.player_id
+  if (!nextPlayer) {
+    return { success: false, error: 'Could not find next player' }
+  }
+  
+  // Reset all monsters' attack status for the ending player (they can attack again next turn)
+  await supabase
+    .from('duel_game_cards')
+    .update({ has_attacked: false })
+    .eq('room_id', roomId)
+    .eq('player_id', playerId)
+    .in('location', ['monster_zone', 'extra_monster_zone'])
+  
+  // Update room: increment turn, set next player, reset to draw phase
+  const { error: updateError } = await supabase
+    .from('duel_rooms')
+    .update({
+      current_turn: nextPlayer,
+      turn_count: (room.turn_count || 1) + 1,
+      turn_phase: 'draw',
+      normal_summon_used: false, // Reset normal summon for new turn
+    })
+    .eq('id', roomId)
+  
+  if (updateError) {
+    return { success: false, error: 'Failed to end turn' }
+  }
+  
+  // Auto-draw for the next player (Draw Phase rule)
+  const shouldDraw = (room.turn_count || 1) >= 1 || room.first_turn_draw
+  if (shouldDraw) {
+    await drawCards(roomId, nextPlayer, 1)
+  }
+  
+  return { success: true, nextPlayer }
+}
+
+// Declare an attack
+export async function declareAttack(
+  roomId: string,
+  attackerId: string,
+  targetId: string | null // null for direct attack
+): Promise<{ 
+  success: boolean; 
+  battleResult?: {
+    damage: number;
+    damageTarget: 'attacker' | 'defender' | 'both' | 'none';
+    attackerDestroyed: boolean;
+    defenderDestroyed: boolean;
+    directAttack: boolean;
+  };
+  error?: string 
+}> {
+  const supabase = await createClient()
+  
+  // Get the attacker card
+  const { data: attacker, error: attackerError } = await supabase
+    .from('duel_game_cards')
+    .select('*')
+    .eq('id', attackerId)
+    .single()
+  
+  if (attackerError || !attacker) {
+    return { success: false, error: 'Attacker not found' }
+  }
+  
+  // Get room to check phase and turn
+  const { data: room, error: roomError } = await supabase
+    .from('duel_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .single()
+  
+  if (roomError || !room) {
+    return { success: false, error: 'Room not found' }
+  }
+  
+  // Can only attack during Battle Phase
+  if (room.turn_phase !== 'battle') {
+    return { success: false, error: 'Can only attack during Battle Phase' }
+  }
+  
+  // Only current turn player can attack
+  if (room.current_turn !== attacker.player_id) {
+    return { success: false, error: 'Not your turn' }
+  }
+  
+  // Check if monster already attacked this turn
+  if (attacker.has_attacked) {
+    return { success: false, error: 'This monster already attacked this turn' }
+  }
+  
+  // Monster must be in Attack Position to attack
+  if (attacker.position !== 'face_up_attack') {
+    return { success: false, error: 'Monster must be in Attack Position to attack' }
+  }
+  
+  let battleResult: {
+    damage: number;
+    damageTarget: 'attacker' | 'defender' | 'both' | 'none';
+    attackerDestroyed: boolean;
+    defenderDestroyed: boolean;
+    directAttack: boolean;
+  }
+  
+  if (targetId) {
+    // Attack a monster
+    const { data: defender, error: defenderError } = await supabase
+      .from('duel_game_cards')
+      .select('*')
+      .eq('id', targetId)
+      .single()
+    
+    if (defenderError || !defender) {
+      return { success: false, error: 'Target not found' }
+    }
+    
+    // Calculate battle damage based on position
+    const attackerAtk = attacker.attack || 0
+    const defenderAtk = defender.attack || 0
+    const defenderDef = defender.defense || 0
+    
+    if (defender.position === 'face_up_attack') {
+      // Attack vs Attack Position
+      const damage = attackerAtk - defenderAtk
+      
+      if (damage > 0) {
+        // Attacker wins - defender destroyed, defender's owner takes damage
+        battleResult = {
+          damage,
+          damageTarget: 'defender',
+          attackerDestroyed: false,
+          defenderDestroyed: true,
+          directAttack: false,
+        }
+        await sendToGraveyard(targetId)
+        await updateLifePoints(roomId, defender.player_id, -damage)
+      } else if (damage < 0) {
+        // Defender wins - attacker destroyed, attacker's owner takes damage
+        battleResult = {
+          damage: Math.abs(damage),
+          damageTarget: 'attacker',
+          attackerDestroyed: true,
+          defenderDestroyed: false,
+          directAttack: false,
+        }
+        await sendToGraveyard(attackerId)
+        await updateLifePoints(roomId, attacker.player_id, damage) // damage is negative
+      } else {
+        // Tie - both destroyed, no damage
+        battleResult = {
+          damage: 0,
+          damageTarget: 'both',
+          attackerDestroyed: true,
+          defenderDestroyed: true,
+          directAttack: false,
+        }
+        await sendToGraveyard(attackerId)
+        await sendToGraveyard(targetId)
+      }
+    } else {
+      // Attack vs Defense Position
+      const damage = attackerAtk - defenderDef
+      
+      if (damage > 0) {
+        // Attacker wins - defender destroyed, no battle damage
+        battleResult = {
+          damage: 0,
+          damageTarget: 'none',
+          attackerDestroyed: false,
+          defenderDestroyed: true,
+          directAttack: false,
+        }
+        await sendToGraveyard(targetId)
+      } else if (damage < 0) {
+        // Defender wins - attacker takes damage, neither destroyed
+        battleResult = {
+          damage: Math.abs(damage),
+          damageTarget: 'attacker',
+          attackerDestroyed: false,
+          defenderDestroyed: false,
+          directAttack: false,
+        }
+        await updateLifePoints(roomId, attacker.player_id, damage)
+      } else {
+        // Tie - nothing happens
+        battleResult = {
+          damage: 0,
+          damageTarget: 'none',
+          attackerDestroyed: false,
+          defenderDestroyed: false,
+          directAttack: false,
+        }
+      }
+      
+      // Flip face-down defender face-up
+      if (defender.position === 'face_down_defense') {
+        await supabase
+          .from('duel_game_cards')
+          .update({ position: 'face_up_defense' })
+          .eq('id', targetId)
+      }
+    }
+  } else {
+    // Direct attack - only allowed if opponent has no monsters
+    const { data: opponentMonsters } = await supabase
+      .from('duel_game_cards')
+      .select('id')
+      .eq('room_id', roomId)
+      .neq('player_id', attacker.player_id)
+      .in('location', ['monster_zone', 'extra_monster_zone'])
+    
+    if (opponentMonsters && opponentMonsters.length > 0) {
+      return { success: false, error: 'Cannot attack directly while opponent has monsters' }
+    }
+    
+    // Find opponent player ID
+    const { data: participants } = await supabase
+      .from('duel_room_participants')
+      .select('player_id')
+      .eq('room_id', roomId)
+      .eq('is_spectator', false)
+      .neq('player_id', attacker.player_id)
+    
+    if (!participants || participants.length === 0) {
+      return { success: false, error: 'Opponent not found' }
+    }
+    
+    const opponentId = participants[0].player_id
+    const damage = attacker.attack || 0
+    
+    battleResult = {
+      damage,
+      damageTarget: 'defender',
+      attackerDestroyed: false,
+      defenderDestroyed: false,
+      directAttack: true,
+    }
+    
+    await updateLifePoints(roomId, opponentId, -damage)
+  }
+  
+  // Mark attacker as having attacked this turn
+  await supabase
+    .from('duel_game_cards')
+    .update({ has_attacked: true })
+    .eq('id', attackerId)
+  
+  return { success: true, battleResult }
+}
+
+// Update life points
+export async function updateLifePoints(
+  roomId: string,
+  playerId: string,
+  change: number // positive = gain, negative = lose
+): Promise<{ success: boolean; newLp?: number; error?: string }> {
+  const supabase = await createClient()
+  
+  // Get current LP
+  const { data: participant, error: fetchError } = await supabase
+    .from('duel_room_participants')
+    .select('life_points')
+    .eq('room_id', roomId)
+    .eq('player_id', playerId)
+    .single()
+  
+  if (fetchError || !participant) {
+    return { success: false, error: 'Participant not found' }
+  }
+  
+  const newLp = Math.max(0, (participant.life_points || 8000) + change)
+  
+  const { error: updateError } = await supabase
+    .from('duel_room_participants')
+    .update({ life_points: newLp })
+    .eq('room_id', roomId)
+    .eq('player_id', playerId)
+  
+  if (updateError) {
+    return { success: false, error: 'Failed to update LP' }
+  }
+  
+  // Check for win condition
+  if (newLp <= 0) {
+    // This player lost - update room status
+    await supabase
+      .from('duel_rooms')
+      .update({ status: 'completed' })
+      .eq('id', roomId)
+  }
+  
+  return { success: true, newLp }
+}
+
+// Normal Summon a monster (with tribute rules)
+export async function normalSummon(
+  roomId: string,
+  playerId: string,
+  cardId: string,
+  zoneIndex: number,
+  tributeIds: string[] = [],
+  inDefensePosition: boolean = false
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  
+  // Get room to check phase and normal summon status
+  const { data: room, error: roomError } = await supabase
+    .from('duel_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .single()
+  
+  if (roomError || !room) {
+    return { success: false, error: 'Room not found' }
+  }
+  
+  // Can only Normal Summon during Main Phase 1 or 2
+  if (room.turn_phase !== 'main' && room.turn_phase !== 'main2') {
+    return { success: false, error: 'Can only Normal Summon during Main Phase' }
+  }
+  
+  // Only current turn player can summon
+  if (room.current_turn !== playerId) {
+    return { success: false, error: 'Not your turn' }
+  }
+  
+  // Check if normal summon already used this turn
+  if (room.normal_summon_used) {
+    return { success: false, error: 'You can only Normal Summon once per turn' }
+  }
+  
+  // Get the card to summon
+  const { data: card, error: cardError } = await supabase
+    .from('duel_game_cards')
+    .select('*')
+    .eq('id', cardId)
+    .single()
+  
+  if (cardError || !card) {
+    return { success: false, error: 'Card not found' }
+  }
+  
+  // Card must be in hand
+  if (card.location !== 'hand') {
+    return { success: false, error: 'Card must be in hand to Normal Summon' }
+  }
+  
+  // Card must be a monster
+  if (!['normal_monster', 'effect_monster'].includes(card.card_type || '')) {
+    return { success: false, error: 'Can only Normal Summon monster cards' }
+  }
+  
+  const level = card.level || 0
+  
+  // Check tribute requirements (Official rules)
+  // Level 1-4: No tribute required
+  // Level 5-6: 1 tribute required
+  // Level 7+: 2 tributes required
+  let requiredTributes = 0
+  if (level >= 7) {
+    requiredTributes = 2
+  } else if (level >= 5) {
+    requiredTributes = 1
+  }
+  
+  if (tributeIds.length < requiredTributes) {
+    return { success: false, error: `Level ${level} monsters require ${requiredTributes} tribute(s)` }
+  }
+  
+  // Tribute the required monsters
+  for (const tributeId of tributeIds) {
+    const { data: tribute } = await supabase
+      .from('duel_game_cards')
+      .select('*')
+      .eq('id', tributeId)
+      .single()
+    
+    if (!tribute || tribute.player_id !== playerId) {
+      return { success: false, error: 'Invalid tribute target' }
+    }
+    
+    if (!['monster_zone', 'extra_monster_zone'].includes(tribute.location || '')) {
+      return { success: false, error: 'Can only tribute monsters on the field' }
+    }
+    
+    await sendToGraveyard(tributeId)
+  }
+  
+  // Summon the monster
+  const position = inDefensePosition ? 'face_up_defense' : 'face_up_attack'
+  
+  const { error: summonError } = await supabase
+    .from('duel_game_cards')
+    .update({
+      location: 'monster_zone',
+      zone_index: zoneIndex,
+      position,
+      has_attacked: false,
+    })
+    .eq('id', cardId)
+  
+  if (summonError) {
+    return { success: false, error: 'Failed to summon monster' }
+  }
+  
+  // Mark normal summon as used this turn
+  await supabase
+    .from('duel_rooms')
+    .update({ normal_summon_used: true })
+    .eq('id', roomId)
+  
+  return { success: true }
+}
+
+// Set a monster face-down (counts as Normal Summon)
+export async function setMonster(
+  roomId: string,
+  playerId: string,
+  cardId: string,
+  zoneIndex: number,
+  tributeIds: string[] = []
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  
+  // Get room to check phase and normal summon status
+  const { data: room, error: roomError } = await supabase
+    .from('duel_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .single()
+  
+  if (roomError || !room) {
+    return { success: false, error: 'Room not found' }
+  }
+  
+  // Can only Set during Main Phase 1 or 2
+  if (room.turn_phase !== 'main' && room.turn_phase !== 'main2') {
+    return { success: false, error: 'Can only Set during Main Phase' }
+  }
+  
+  // Only current turn player can set
+  if (room.current_turn !== playerId) {
+    return { success: false, error: 'Not your turn' }
+  }
+  
+  // Check if normal summon already used this turn (Setting counts as normal summon)
+  if (room.normal_summon_used) {
+    return { success: false, error: 'You can only Normal Summon/Set once per turn' }
+  }
+  
+  // Get the card
+  const { data: card, error: cardError } = await supabase
+    .from('duel_game_cards')
+    .select('*')
+    .eq('id', cardId)
+    .single()
+  
+  if (cardError || !card) {
+    return { success: false, error: 'Card not found' }
+  }
+  
+  // Card must be in hand
+  if (card.location !== 'hand') {
+    return { success: false, error: 'Card must be in hand to Set' }
+  }
+  
+  const level = card.level || 0
+  
+  // Check tribute requirements
+  let requiredTributes = 0
+  if (level >= 7) {
+    requiredTributes = 2
+  } else if (level >= 5) {
+    requiredTributes = 1
+  }
+  
+  if (tributeIds.length < requiredTributes) {
+    return { success: false, error: `Level ${level} monsters require ${requiredTributes} tribute(s)` }
+  }
+  
+  // Tribute the required monsters
+  for (const tributeId of tributeIds) {
+    await sendToGraveyard(tributeId)
+  }
+  
+  // Set the monster face-down
+  const { error: setError } = await supabase
+    .from('duel_game_cards')
+    .update({
+      location: 'monster_zone',
+      zone_index: zoneIndex,
+      position: 'face_down_defense',
+      has_attacked: false,
+    })
+    .eq('id', cardId)
+  
+  if (setError) {
+    return { success: false, error: 'Failed to set monster' }
+  }
+  
+  // Mark normal summon as used
+  await supabase
+    .from('duel_rooms')
+    .update({ normal_summon_used: true })
+    .eq('id', roomId)
+  
+  return { success: true }
+}
+
+// Flip Summon a face-down monster
+export async function flipSummon(
+  roomId: string,
+  playerId: string,
+  cardId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  
+  // Get room
+  const { data: room, error: roomError } = await supabase
+    .from('duel_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .single()
+  
+  if (roomError || !room) {
+    return { success: false, error: 'Room not found' }
+  }
+  
+  // Can only Flip Summon during Main Phase
+  if (room.turn_phase !== 'main' && room.turn_phase !== 'main2') {
+    return { success: false, error: 'Can only Flip Summon during Main Phase' }
+  }
+  
+  // Only current turn player can flip summon
+  if (room.current_turn !== playerId) {
+    return { success: false, error: 'Not your turn' }
+  }
+  
+  // Get the card
+  const { data: card, error: cardError } = await supabase
+    .from('duel_game_cards')
+    .select('*')
+    .eq('id', cardId)
+    .single()
+  
+  if (cardError || !card) {
+    return { success: false, error: 'Card not found' }
+  }
+  
+  // Card must be face-down defense position
+  if (card.position !== 'face_down_defense') {
+    return { success: false, error: 'Can only Flip Summon face-down Defense Position monsters' }
+  }
+  
+  // Cannot Flip Summon a monster that was just Set this turn
+  // (would need turn_set_on tracking for this - simplified for now)
+  
+  // Flip to Attack Position
+  const { error: flipError } = await supabase
+    .from('duel_game_cards')
+    .update({ position: 'face_up_attack' })
+    .eq('id', cardId)
+  
+  if (flipError) {
+    return { success: false, error: 'Failed to flip summon' }
+  }
+  
+  return { success: true }
+}
