@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import {
   Dialog,
@@ -15,9 +15,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { 
   Sword, Shield, Star, Sparkles, AlertCircle, 
-  Search, Target, Trash2, RotateCcw, Plus, Zap
+  Search, Target, Trash2, RotateCcw, Plus, Zap, Heart, Wand2
 } from 'lucide-react'
 import type { DuelGameCard } from '@/lib/types'
+import { getCardScript, parseEffectText } from '@/lib/duel-engine/card-scripts'
 
 interface EffectActivationModalProps {
   isOpen: boolean
@@ -36,42 +37,10 @@ export type EffectAction =
   | { type: 'negate' }
   | { type: 'draw'; count: number }
   | { type: 'send_to_gy'; targetIds: string[] }
+  | { type: 'gain_lp'; amount: number }
+  | { type: 'inflict_damage'; amount: number }
+  | { type: 'change_atk_def' }
   | { type: 'manual' } // For effects that need manual resolution
-
-// Parse common effect keywords to suggest actions
-function parseEffectKeywords(effectText: string | null | undefined): string[] {
-  if (!effectText) return []
-  
-  const keywords: string[] = []
-  const text = effectText.toLowerCase()
-  
-  if (text.includes('add') && (text.includes('hand') || text.includes('deck'))) {
-    keywords.push('search')
-  }
-  if (text.includes('special summon')) {
-    keywords.push('special_summon')
-  }
-  if (text.includes('destroy')) {
-    keywords.push('destroy')
-  }
-  if (text.includes('draw')) {
-    keywords.push('draw')
-  }
-  if (text.includes('banish')) {
-    keywords.push('banish')
-  }
-  if (text.includes('negate')) {
-    keywords.push('negate')
-  }
-  if (text.includes('send') && text.includes('graveyard')) {
-    keywords.push('send_to_gy')
-  }
-  if (text.includes('target')) {
-    keywords.push('target')
-  }
-  
-  return keywords
-}
 
 export function EffectActivationModal({
   isOpen,
@@ -84,12 +53,23 @@ export function EffectActivationModal({
 
   if (!card) return null
 
+  // Try to get the card script for scripted effect handling
+  const cardScript = card.card_id ? getCardScript(card.card_id) : undefined
+  
+  // Parse effect text for action keywords
+  const { possibleActions, keywords: effectKeywords } = useMemo(() => {
+    return parseEffectText(card.effect_text || '')
+  }, [card.effect_text])
+
   const imageUrl = card.card_id
     ? `https://images.ygoprodeck.com/images/cards/${card.card_id}.jpg`
     : '/images/card-back.jpg'
 
   const isMonster = ['monster', 'normal_monster', 'effect_monster', 'fusion', 'synchro', 'xyz', 'link', 'pendulum'].includes(card.card_type)
-  const effectKeywords = parseEffectKeywords(card.effect_text)
+  
+  // Check if this card has a scripted effect
+  const hasScript = !!cardScript && cardScript.effects.length > 0
+  const scriptedEffects = cardScript?.effects || []
 
   const handleResolve = (actionType: string) => {
     switch (actionType) {
@@ -184,7 +164,24 @@ export function EffectActivationModal({
                 <div className="flex flex-wrap gap-1">
                   {effectKeywords.map(keyword => (
                     <Badge key={keyword} variant="outline" className="text-[10px] capitalize">
-                      {keyword.replace('_', ' ')}
+                      {keyword}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Scripted Effect Info */}
+            {hasScript && (
+              <div className="mb-3 p-2 rounded bg-green-950/30 border border-green-800/50">
+                <p className="text-xs text-green-400 flex items-center gap-1">
+                  <Wand2 className="h-3 w-3" />
+                  This card has scripted effects for automatic resolution
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {scriptedEffects.map(eff => (
+                    <Badge key={eff.id} variant="secondary" className="text-[10px]">
+                      {eff.name}
                     </Badge>
                   ))}
                 </div>
@@ -197,7 +194,7 @@ export function EffectActivationModal({
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Select action to resolve:</p>
               <div className="grid grid-cols-2 gap-2">
-                {effectKeywords.includes('search') && (
+                {possibleActions.includes('SEARCH_DECK') && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -208,7 +205,7 @@ export function EffectActivationModal({
                     Search Deck
                   </Button>
                 )}
-                {effectKeywords.includes('draw') && (
+                {possibleActions.includes('DRAW') && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -219,7 +216,7 @@ export function EffectActivationModal({
                     Draw Card(s)
                   </Button>
                 )}
-                {effectKeywords.includes('destroy') && (
+                {possibleActions.includes('DESTROY') && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -230,7 +227,7 @@ export function EffectActivationModal({
                     Destroy Target(s)
                   </Button>
                 )}
-                {effectKeywords.includes('special_summon') && (
+                {possibleActions.includes('SPECIAL_SUMMON') && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -241,7 +238,7 @@ export function EffectActivationModal({
                     Special Summon
                   </Button>
                 )}
-                {effectKeywords.includes('banish') && (
+                {possibleActions.includes('BANISH') && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -252,7 +249,7 @@ export function EffectActivationModal({
                     Banish
                   </Button>
                 )}
-                {effectKeywords.includes('negate') && (
+                {possibleActions.includes('NEGATE_EFFECT') && (
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -260,7 +257,29 @@ export function EffectActivationModal({
                     onClick={() => handleResolve('negate')}
                   >
                     <AlertCircle className="h-4 w-4 mr-2" />
-                    Negate
+                    Negate Effect
+                  </Button>
+                )}
+                {possibleActions.includes('INFLICT_DAMAGE') && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="justify-start"
+                    onClick={() => handleResolve('damage')}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Inflict Damage
+                  </Button>
+                )}
+                {possibleActions.includes('GAIN_LIFEPOINTS') && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="justify-start"
+                    onClick={() => handleResolve('gain_lp')}
+                  >
+                    <Heart className="h-4 w-4 mr-2" />
+                    Gain LP
                   </Button>
                 )}
               </div>

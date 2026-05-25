@@ -6,3 +6,6 @@ export * from './constants'
 export { GameStateManager, getGameStateManager, clearGameStateManager } from './game-state'
 export { RuleValidator } from './rule-validator'
 export { ActionExecutor, actionExecutor } from './action-executor'
+
+// Card scripting system - data-driven effect definitions
+export * from './card-scripts'

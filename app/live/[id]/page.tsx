@@ -988,6 +988,19 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       // Initialize decks for all duelists who have a deck selected
       for (const participant of actualDuelists) {
         if (participant.deck_id) {
+          // Check if cards already exist for this player (prevent duplicate init)
+          const { data: existingCards } = await supabase
+            .from('duel_game_cards')
+            .select('id')
+            .eq('room_id', room.id)
+            .eq('player_id', participant.player_id)
+            .limit(1)
+          
+          if (existingCards && existingCards.length > 0) {
+            console.log(`[v0] Skipping deck init for ${participant.player_id} - cards already exist`)
+            continue
+          }
+          
           const initResult = await initializeDuelDeck(room.id, participant.player_id, participant.deck_id)
           if (!initResult.success) {
             toast.error(`Failed to initialize deck for ${participant.player.nickname}`)
