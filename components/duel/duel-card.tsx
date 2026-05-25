@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { 
-  Sword, Shield, Flame, 
+  Sword, Shield, Flame, RotateCcw,
   Eye, EyeOff, Plus, Minus, ChevronRight
 } from 'lucide-react'
 import type { DuelGameCard, CardPosition } from '@/lib/types'
