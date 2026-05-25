@@ -3,7 +3,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { DuelCard, EmptyZone } from './duel-card'
 import { CardInfoPanel } from './card-info-panel'
-import { DeckSearchModal } from './deck-search-modal'
 import { ChainPrompt } from './chain-prompt'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,11 +15,10 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { 
-  Layers, Flame, Ban, RotateCcw, Eye, Shuffle, Sparkles, Heart, Search, Plus
+  Layers, RotateCcw, Eye, Shuffle, Sparkles, Heart, Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  drawCards,
   summonMonster,
   setSpellTrap,
   activateSpellTrap,
@@ -71,9 +69,8 @@ export function DuelField({
   const [banishedOpen, setBanishedOpen] = useState<'mine' | 'opponent' | null>(null)
   const [extraDeckOpen, setExtraDeckOpen] = useState(false)
   
-  // New state for card info, deck search, and chain system
+  // New state for card info and chain system
   const [hoveredCard, setHoveredCard] = useState<DuelGameCard | null>(null)
-  const [deckSearchOpen, setDeckSearchOpen] = useState(false)
   const [chainPrompt, setChainPrompt] = useState<{
     activatingCard: DuelGameCard
     activatingPlayerId: string
@@ -117,16 +114,6 @@ export function DuelField({
   }, [allCards, myPlayerId, opponentPlayerId])
 
   // Card action handlers
-  const handleDraw = useCallback(async () => {
-    const result = await drawCards(room.id, myPlayerId, 1)
-    if (result.success) {
-      toast.success('Drew a card')
-      onCardsChanged()
-    } else {
-      toast.error(result.error || 'Failed to draw')
-    }
-  }, [room.id, myPlayerId, onCardsChanged])
-
   const handleSummon = useCallback(async (card: DuelGameCard, position: 'face_up_attack' | 'face_up_defense' | 'face_down_defense') => {
     setPendingAction({ type: 'summon', card, position })
     setSelectingZone('monster')
@@ -229,28 +216,6 @@ export function DuelField({
       onCardsChanged()
     } else {
       toast.error(result.error || 'Failed to shuffle')
-    }
-  }, [room.id, myPlayerId, onCardsChanged])
-
-  // Handle deck search - add selected card to hand
-  const handleDeckSearch = useCallback(async (card: DuelGameCard) => {
-    // Move card from deck to hand
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    
-    const { error } = await supabase
-      .from('duel_game_cards')
-      .update({ location: 'hand' })
-      .eq('id', card.id)
-    
-    if (error) {
-      toast.error('Failed to add card to hand')
-    } else {
-      toast.success(`Added ${card.card_name} to hand`)
-      setDeckSearchOpen(false)
-      onCardsChanged()
-      // After searching, shuffle the deck
-      await shuffleDeck(room.id, myPlayerId)
     }
   }, [room.id, myPlayerId, onCardsChanged])
 
@@ -544,35 +509,11 @@ export function DuelField({
             <div className="flex justify-center items-center gap-2">
               {/* My Deck & Graveyard (left side for me) */}
               <div className="flex flex-col gap-1">
-                <div className="relative cursor-pointer hover:scale-105 transition-transform" onClick={handleDraw} title="Click to draw">
+                <div className="relative">
                   <EmptyZone type="deck" size="sm" />
                   <span className="absolute -bottom-1 -right-1 text-[8px] bg-blue-600 text-white px-1 rounded">
                     {organizedCards.my.deck.length}
                   </span>
-                </div>
-                <div className="relative cursor-pointer" onClick={() => setGraveyardOpen('mine')}>
-                  {organizedCards.my.graveyard.length > 0 ? (
-                    <DuelCard card={organizedCards.my.graveyard[0]} isOwner={true} size="sm" showActions={false} />
-                  ) : (
-                    <EmptyZone type="graveyard" size="sm" />
-                  )}
-                  {organizedCards.my.graveyard.length > 0 && (
-                    <span className="absolute -bottom-1 -right-1 text-[8px] bg-orange-600 text-white px-1 rounded">
-                      {organizedCards.my.graveyard.length}
-                    </span>
-                  )}
-                </div>
-                <div className="relative cursor-pointer" onClick={() => setBanishedOpen('mine')}>
-                  {organizedCards.my.banished.length > 0 ? (
-                    <DuelCard card={organizedCards.my.banished[0]} isOwner={true} size="sm" showActions={false} />
-                  ) : (
-                    <EmptyZone type="banished" size="sm" />
-                  )}
-                  {organizedCards.my.banished.length > 0 && (
-                    <span className="absolute -bottom-1 -right-1 text-[8px] bg-purple-600 text-white px-1 rounded">
-                      {organizedCards.my.banished.length}
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -623,21 +564,9 @@ export function DuelField({
                 </div>
               </div>
               <div className="flex gap-1">
-                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-cyan-700/50 hover:bg-cyan-900/30" onClick={handleDraw}>
-                  Draw
-                </Button>
               <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={handleShuffleDeck}>
                 <Shuffle className="h-3 w-3" />
               </Button>
-              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={() => setDeckSearchOpen(true)} title="Search Deck">
-                <Search className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setGraveyardOpen('mine')}>
-                  <Flame className="h-3 w-3 mr-0.5 text-orange-400" />{organizedCards.my.graveyard.length}
-                </Button>
-                <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setBanishedOpen('mine')}>
-                  <Ban className="h-3 w-3 mr-0.5 text-purple-400" />{organizedCards.my.banished.length}
-                </Button>
               </div>
             </div>
 
@@ -785,21 +714,6 @@ export function DuelField({
           </ScrollArea>
         </DialogContent>
       </Dialog>
-
-      {/* Deck Search Modal */}
-      <DeckSearchModal
-        open={deckSearchOpen}
-        onClose={() => setDeckSearchOpen(false)}
-        cards={organizedCards.my.deck}
-        onSelectCard={(card, action) => {
-          if (action === 'add_to_hand') {
-            handleDeckSearch(card)
-          } else if (action === 'special_summon') {
-            handleSpecialSummon(card, 'face_up_attack')
-          }
-        }}
-        allowedActions={['add_to_hand', 'special_summon']}
-      />
 
       {/* Chain Prompt - shows when opponent activates something */}
       {chainPrompt && (
