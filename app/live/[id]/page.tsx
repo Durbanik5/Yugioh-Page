@@ -1197,6 +1197,9 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const handlePhaseChange = async (phase: TurnPhase) => {
     if (!room) return
 
+    // Optimistic update for instant feedback
+    setRoom(prev => prev ? { ...prev, turn_phase: phase } : null)
+
     await supabase
       .from('duel_rooms')
       .update({ turn_phase: phase })
