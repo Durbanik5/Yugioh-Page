@@ -3,6 +3,48 @@
 import { createClient } from '@/lib/supabase/server'
 import type { DuelGameCard, CardLocation, CardPosition, DuelCardType } from '@/lib/types'
 
+// Cache for card lookups to avoid repeated API calls
+const cardCache = new Map<string, { id: number; type: string; atk?: number; def?: number; level?: number; attribute?: string }>()
+
+// Lookup card details from YGOProDeck API
+async function lookupCardDetails(cardName: string): Promise<{ id: number; type: string; atk?: number; def?: number; level?: number; attribute?: string } | null> {
+  // Check cache first
+  if (cardCache.has(cardName)) {
+    return cardCache.get(cardName)!
+  }
+
+  try {
+    const response = await fetch(
+      `https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(cardName)}`,
+      { next: { revalidate: 86400 } } // Cache for 24 hours
+    )
+    
+    if (!response.ok) {
+      console.error(`[v0] Failed to lookup card: ${cardName}`)
+      return null
+    }
+    
+    const data = await response.json()
+    if (data.data && data.data.length > 0) {
+      const card = data.data[0]
+      const result = {
+        id: card.id,
+        type: card.type,
+        atk: card.atk,
+        def: card.def,
+        level: card.level || card.linkval,
+        attribute: card.attribute
+      }
+      cardCache.set(cardName, result)
+      return result
+    }
+  } catch (error) {
+    console.error(`[v0] Error looking up card ${cardName}:`, error)
+  }
+  
+  return null
+}
+
 // Initialize a player's deck for the duel
 export async function initializeDuelDeck(
   roomId: string,
@@ -28,22 +70,60 @@ export async function initializeDuelDeck(
     .eq('room_id', roomId)
     .eq('player_id', playerId)
 
-  // Separate main deck and extra deck cards
-  const extraDeckTypes = ['fusion', 'synchro', 'xyz', 'link']
-  const mainDeckCards: typeof deckCards = []
-  const extraDeckCards: typeof deckCards = []
+  // Expand cards based on quantity and lookup their IDs
+  const expandedCards: Array<{
+    card_name: string
+    card_type: string
+    card_id: number | null
+    attack: number | null
+    defense: number | null
+    level: number | null
+    attribute: string | null
+    deck_category: string | null
+  }> = []
 
   for (const card of deckCards) {
+    // Lookup card details from API
+    const cardDetails = await lookupCardDetails(card.card_name)
+    
+    // Expand based on quantity (each copy is a separate card in the duel)
+    const qty = card.quantity || 1
+    for (let i = 0; i < qty; i++) {
+      expandedCards.push({
+        card_name: card.card_name,
+        card_type: cardDetails?.type || card.card_type || 'Monster',
+        card_id: cardDetails?.id || null,
+        attack: cardDetails?.atk ?? null,
+        defense: cardDetails?.def ?? null,
+        level: cardDetails?.level ?? null,
+        attribute: cardDetails?.attribute ?? null,
+        deck_category: card.deck_category
+      })
+    }
+  }
+
+  // Separate main deck and extra deck cards
+  const extraDeckTypes = ['fusion', 'synchro', 'xyz', 'link']
+  const mainDeckCards: typeof expandedCards = []
+  const extraDeckCards: typeof expandedCards = []
+
+  for (const card of expandedCards) {
     const cardTypeLower = (card.card_type || '').toLowerCase()
-    if (extraDeckTypes.some(t => cardTypeLower.includes(t))) {
+    const isExtraDeck = extraDeckTypes.some(t => cardTypeLower.includes(t)) || card.deck_category === 'extra'
+    
+    if (isExtraDeck) {
       extraDeckCards.push(card)
     } else {
       mainDeckCards.push(card)
     }
   }
 
-  // Shuffle main deck
-  const shuffledMainDeck = [...mainDeckCards].sort(() => Math.random() - 0.5)
+  // Shuffle main deck (Fisher-Yates shuffle for better randomization)
+  const shuffledMainDeck = [...mainDeckCards]
+  for (let i = shuffledMainDeck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffledMainDeck[i], shuffledMainDeck[j]] = [shuffledMainDeck[j], shuffledMainDeck[i]]
+  }
 
   // Insert all cards into duel_game_cards
   const cardsToInsert = [
@@ -84,9 +164,11 @@ export async function initializeDuelDeck(
     .insert(cardsToInsert)
 
   if (insertError) {
+    console.error('[v0] Failed to insert cards:', insertError)
     return { success: false, error: 'Failed to initialize deck' }
   }
 
+  console.log(`[v0] Initialized deck for player ${playerId}: ${shuffledMainDeck.length} main deck, ${extraDeckCards.length} extra deck`)
   return { success: true }
 }
 
