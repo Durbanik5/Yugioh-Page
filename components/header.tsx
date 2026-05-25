@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle } from 'lucide-react'
+import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper } from 'lucide-react'
 
 export function Header() {
   return (
@@ -56,6 +56,12 @@ export function Header() {
             <Link href="/community" className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Community</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/news" className="flex items-center gap-2">
+              <Newspaper className="h-4 w-4" />
+              <span className="hidden sm:inline">News</span>
             </Link>
           </Button>
         </nav>
