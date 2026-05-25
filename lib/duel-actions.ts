@@ -136,14 +136,16 @@ export async function drawCards(
     return { success: false, error: 'Failed to draw cards' }
   }
 
-  // Update hand count in participant
-  await supabase.rpc('increment_hand_count', { 
-    p_room_id: roomId, 
-    p_player_id: playerId, 
-    p_amount: count 
-  }).catch(() => {
-    // Fallback if RPC doesn't exist
-  })
+  // Update hand count in participant (ignore errors - RPC may not exist)
+  try {
+    await supabase
+      .from('duel_room_participants')
+      .update({ hand_count: count })
+      .eq('room_id', roomId)
+      .eq('player_id', playerId)
+  } catch {
+    // Ignore update errors
+  }
 
   return { success: true, drawnCards: deckCards as DuelGameCard[] }
 }
