@@ -75,7 +75,6 @@ export function DuelField({
     executeSpellTrapActivation,
     setSpellTrap: engineSetSpellTrap,
     changePhase,
-    startDuel,
   } = useDuelEngine({ room, myPlayerId, allCards, onCardsChanged })
 
   const [selectedCard, setSelectedCard] = useState<DuelGameCard | null>(null)

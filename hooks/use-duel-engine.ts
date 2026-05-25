@@ -563,48 +563,6 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     onCardsChanged()
   }, [isMyTurn, gameState, room, myPlayerId, allCards, supabase, onCardsChanged])
 
-  // Start the duel (called when both players are ready)
-  const startDuel = useCallback(async () => {
-    const participants = room.duel_room_participants || []
-    if (participants.length < 2) {
-      toast.error('Need 2 players to start')
-      return
-    }
-
-    // Determine who goes first (could be random or choice)
-    const firstPlayer = participants[0].player_id
-
-    // Draw 5 cards for each player
-    for (const participant of participants) {
-      const deck = allCards.filter(
-        c => c.player_id === participant.player_id && c.location === 'deck'
-      ).sort((a, b) => a.order_index - b.order_index)
-
-      const cardsToDraw = deck.slice(0, 5)
-      for (const card of cardsToDraw) {
-        await supabase
-          .from('duel_game_cards')
-          .update({ location: 'hand' })
-          .eq('id', card.id)
-      }
-    }
-
-    // Set initial game state
-    await supabase
-      .from('duel_game_state')
-      .upsert({
-        room_id: room.id,
-        turn_player: firstPlayer,
-        turn_count: 1,
-        phase: 'draw',
-        priority_player: firstPlayer,
-        battle_phase_enabled: false, // First turn player can't enter battle phase
-      })
-
-    toast.success('Duel started! Draw your opening hand.')
-    onCardsChanged()
-  }, [room, allCards, supabase, onCardsChanged])
-
   return {
     gameState,
     isLoading,
@@ -625,6 +583,5 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     executeSpellTrapActivation,
     setSpellTrap,
     changePhase,
-    startDuel,
   }
 }

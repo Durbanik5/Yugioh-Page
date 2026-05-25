@@ -733,6 +733,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [changingDeck, setChangingDeck] = useState('')
   const [roomSettingsOpen, setRoomSettingsOpen] = useState(false)
   const [isStartingDuel, setIsStartingDuel] = useState(false)
+  const isStartingDuelRef = useRef(false)
   
   // Room settings state (for editing)
   const [editStartingLp, setEditStartingLp] = useState(8000)
@@ -951,8 +952,9 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   }
 
   const handleStartDuel = async () => {
-    if (!room || isStartingDuel) return
-    
+    // Use ref for synchronous check to prevent multiple rapid calls
+    if (!room || isStartingDuelRef.current) return
+    isStartingDuelRef.current = true
     setIsStartingDuel(true)
     
     try {
@@ -1023,10 +1025,11 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
         description: `Duel started! Each player draws ${startingHandSize} cards.`,
       })
 
-      toast.success('Duel started!')
-      await fetchRoom() // Refresh room to show active state
-      fetchDuelGameCards()
+    toast.success('Duel started!')
+    await fetchRoom() // Refresh room to show active state
+    fetchDuelGameCards()
     } finally {
+      isStartingDuelRef.current = false
       setIsStartingDuel(false)
     }
   }
