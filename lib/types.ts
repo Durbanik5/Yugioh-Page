@@ -3,6 +3,7 @@ export interface Player {
   nickname: string
   avatar_url: string | null
   auth_user_id: string | null
+  community_points: number
   created_at: string
   updated_at: string
 }

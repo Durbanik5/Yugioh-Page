@@ -30,7 +30,7 @@ import { toast } from 'sonner'
 import { 
   Trophy, Target, Percent, Swords, Users, 
   ChevronLeft, Trash2, Plus, Layers, Medal,
-  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award, Bookmark, Heart
+  TrendingUp, TrendingDown, Minus, Star, Flame, Crown, Zap, Award, Bookmark, Heart, Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -752,6 +752,14 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
               <div>
                 <p className="text-2xl font-bold text-foreground font-mono">{totalGames}</p>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Duels</p>
+              </div>
+            </div>
+            <div className="h-10 w-px bg-border hidden sm:block" />
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-6 w-6 text-yellow-500" />
+              <div>
+                <p className="text-2xl font-bold text-foreground font-mono">{player.community_points ?? 0}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Community</p>
               </div>
             </div>
           </div>
