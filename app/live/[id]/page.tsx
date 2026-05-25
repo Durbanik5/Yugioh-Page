@@ -732,6 +732,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [deckChangeDialogOpen, setDeckChangeDialogOpen] = useState(false)
   const [changingDeck, setChangingDeck] = useState('')
   const [roomSettingsOpen, setRoomSettingsOpen] = useState(false)
+  const [isStartingDuel, setIsStartingDuel] = useState(false)
   
   // Room settings state (for editing)
   const [editStartingLp, setEditStartingLp] = useState(8000)
@@ -950,78 +951,84 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   }
 
   const handleStartDuel = async () => {
-    if (!room) return
+    if (!room || isStartingDuel) return
     
-    if (duelists.length < 2) {
-      toast.error('Need at least 2 duelists to start')
-      return
-    }
-
-    // For 1v1, ensure only 2 duelists - convert extras to spectators
-    if (room.match_type === '1v1' && duelists.length > 2) {
-      const toConvert = duelists.slice(2)
-      for (const participant of toConvert) {
-        await supabase
-          .from('duel_room_participants')
-          .update({ is_spectator: true })
-          .eq('id', participant.id)
+    setIsStartingDuel(true)
+    
+    try {
+      if (duelists.length < 2) {
+        toast.error('Need at least 2 duelists to start')
+        return
       }
-      toast.info(`${toConvert.length} extra player(s) moved to spectators for 1v1`)
-    }
 
-    const startingHandSize = room.starting_hand_size || 5
-    const actualDuelists = room.match_type === '1v1' ? duelists.slice(0, 2) : duelists
-    
-    // Check if at least one duelist has a deck
-    const duelistsWithDecks = actualDuelists.filter(d => d.deck_id)
-    if (duelistsWithDecks.length === 0) {
-      toast.error('At least one duelist must have a deck selected to start the duel')
-      return
-    }
+      // For 1v1, ensure only 2 duelists - convert extras to spectators
+      if (room.match_type === '1v1' && duelists.length > 2) {
+        const toConvert = duelists.slice(2)
+        for (const participant of toConvert) {
+          await supabase
+            .from('duel_room_participants')
+            .update({ is_spectator: true })
+            .eq('id', participant.id)
+        }
+        toast.info(`${toConvert.length} extra player(s) moved to spectators for 1v1`)
+      }
 
-    // Initialize decks for all duelists who have a deck selected
-    for (const participant of actualDuelists) {
-      if (participant.deck_id) {
-        const initResult = await initializeDuelDeck(room.id, participant.player_id, participant.deck_id)
-        if (!initResult.success) {
-          toast.error(`Failed to initialize deck for ${participant.player.nickname}`)
-          return
+      const startingHandSize = room.starting_hand_size || 5
+      const actualDuelists = room.match_type === '1v1' ? duelists.slice(0, 2) : duelists
+      
+      // Check if at least one duelist has a deck
+      const duelistsWithDecks = actualDuelists.filter(d => d.deck_id)
+      if (duelistsWithDecks.length === 0) {
+        toast.error('At least one duelist must have a deck selected to start the duel')
+        return
+      }
+
+      // Initialize decks for all duelists who have a deck selected
+      for (const participant of actualDuelists) {
+        if (participant.deck_id) {
+          const initResult = await initializeDuelDeck(room.id, participant.player_id, participant.deck_id)
+          if (!initResult.success) {
+            toast.error(`Failed to initialize deck for ${participant.player.nickname}`)
+            return
+          }
+          
+          // Draw starting hand
+          const drawResult = await drawCards(room.id, participant.player_id, startingHandSize)
+          if (!drawResult.success) {
+            toast.error(`Failed to draw starting hand for ${participant.player.nickname}`)
+          }
         }
         
-        // Draw starting hand
-        const drawResult = await drawCards(room.id, participant.player_id, startingHandSize)
-        if (!drawResult.success) {
-          toast.error(`Failed to draw starting hand for ${participant.player.nickname}`)
-        }
+        // Update hand count
+        await supabase
+          .from('duel_room_participants')
+          .update({ hand_count: startingHandSize })
+          .eq('id', participant.id)
       }
-      
-      // Update hand count
+
       await supabase
-        .from('duel_room_participants')
-        .update({ hand_count: startingHandSize })
-        .eq('id', participant.id)
-    }
+        .from('duel_rooms')
+        .update({ 
+          status: 'active', 
+          started_at: new Date().toISOString(),
+          turn_count: 1,
+          current_turn_player_id: actualDuelists[0].player_id,
+          turn_phase: 'draw'
+        })
+        .eq('id', id)
 
-    await supabase
-      .from('duel_rooms')
-      .update({ 
-        status: 'active', 
-        started_at: new Date().toISOString(),
-        turn_count: 1,
-        current_turn_player_id: actualDuelists[0].player_id,
-        turn_phase: 'draw'
+      await supabase.from('duel_room_events').insert({
+        room_id: id,
+        event_type: 'game_start',
+        description: `Duel started! Each player draws ${startingHandSize} cards.`,
       })
-      .eq('id', id)
 
-    await supabase.from('duel_room_events').insert({
-      room_id: id,
-      event_type: 'game_start',
-      description: `Duel started! Each player draws ${startingHandSize} cards.`,
-    })
-
-    toast.success('Duel started!')
-    await fetchRoom() // Refresh room to show active state
-    fetchDuelGameCards()
+      toast.success('Duel started!')
+      await fetchRoom() // Refresh room to show active state
+      fetchDuelGameCards()
+    } finally {
+      setIsStartingDuel(false)
+    }
   }
 
   const handleChangeDeck = async () => {
@@ -1769,9 +1776,22 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
             {/* Start Duel */}
             {room.status === 'waiting' && isHost && duelists.length >= 2 && (
-              <Button onClick={handleStartDuel} className="bg-green-600 hover:bg-green-700">
-                <Play className="h-4 w-4 mr-2" />
-                Start Duel
+              <Button 
+                onClick={handleStartDuel} 
+                className="bg-green-600 hover:bg-green-700"
+                disabled={isStartingDuel}
+              >
+                {isStartingDuel ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Duel
+                  </>
+                )}
               </Button>
             )}
 
