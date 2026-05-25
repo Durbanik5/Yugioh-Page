@@ -2,6 +2,15 @@ export interface Player {
   id: string
   nickname: string
   avatar_url: string | null
+  auth_user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UserProfile {
+  id: string
+  username: string
+  is_admin: boolean
   created_at: string
   updated_at: string
 }
