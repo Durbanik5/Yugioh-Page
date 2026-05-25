@@ -153,6 +153,7 @@ export interface DuelRoom {
   first_turn_draw: boolean
   shuffle_deck: boolean
   time_per_turn: number | null
+  normal_summon_used: boolean
   created_at: string
   started_at: string | null
   ended_at: string | null
@@ -193,6 +194,7 @@ export interface DuelGameCard {
   attribute: string | null
   counters: number
   is_revealed: boolean
+  has_attacked: boolean
   order_index: number
   created_at: string
   updated_at: string
