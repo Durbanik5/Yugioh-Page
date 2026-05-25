@@ -18,6 +18,7 @@ export interface Deck {
   banner_url: string | null
   format: DeckFormat
   mvp_card_name: string | null
+  is_published: boolean
   created_at: string
 }
 
@@ -270,4 +271,32 @@ export interface PlayerProfile {
 export interface PlayerProfileWithRelations extends PlayerProfile {
   featured_deck?: DeckWithCards | null
   rival?: Player | null
+}
+
+// Community Types
+export interface CommunityDeckRating {
+  id: string
+  deck_id: string
+  player_id: string
+  rating: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CommunityDeckFavorite {
+  id: string
+  deck_id: string
+  player_id: string
+  created_at: string
+}
+
+export interface PublishedDeck extends Deck {
+  is_published: boolean
+  player: Player
+  cards: DeckCard[]
+  average_rating: number | null
+  rating_count: number
+  favorite_count: number
+  user_rating?: number | null
+  is_favorited?: boolean
 }

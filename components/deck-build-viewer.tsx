@@ -33,8 +33,9 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw, Search, Loader2, X, Pencil, ImagePlus, Clock, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Sparkles, Zap, Shield, Trophy, Target, Layers, Star, RefreshCw, Search, Loader2, X, Pencil, ImagePlus, Clock, TrendingUp, TrendingDown, Globe, GlobeLock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { publishDeck, unpublishDeck } from '@/lib/community-actions'
 import type { DeckWithCards, DeckCard, DeckFormat, DeckChange } from '@/lib/types'
 
 type DeckCategory = 'main' | 'extra' | 'side'
@@ -104,6 +105,8 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
   const [editBannerUrl, setEditBannerUrl] = useState(deck.banner_url || '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [isPublished, setIsPublished] = useState(deck.is_published || false)
   const [deckChanges, setDeckChanges] = useState<DeckChange[]>(deck.changes || [])
   
   const router = useRouter()
@@ -372,6 +375,34 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
     }
   }
 
+  const handleTogglePublish = async () => {
+    setPublishing(true)
+    try {
+      if (isPublished) {
+        const result = await unpublishDeck(deck.id)
+        if (result.success) {
+          setIsPublished(false)
+          toast.success('Deck removed from community')
+        } else {
+          toast.error(result.error || 'Failed to unpublish deck')
+        }
+      } else {
+        const result = await publishDeck(deck.id)
+        if (result.success) {
+          setIsPublished(true)
+          toast.success('Deck published to community!')
+        } else {
+          toast.error(result.error || 'Failed to publish deck')
+        }
+      }
+    } catch (error) {
+      console.error('Publish error:', error)
+      toast.error('An error occurred')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   const getCardTypeColor = (type: string) => {
     switch (type) {
       case 'monster': return 'border-yellow-500/30 bg-yellow-500/10'
@@ -495,7 +526,29 @@ export function DeckBuildViewer({ deck, record }: DeckBuildViewerProps) {
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-6 w-6 ${isPublished ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                    onClick={handleTogglePublish}
+                    disabled={publishing}
+                    title={isPublished ? 'Remove from community' : 'Publish to community'}
+                  >
+                    {publishing ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : isPublished ? (
+                      <Globe className="h-3 w-3" />
+                    ) : (
+                      <GlobeLock className="h-3 w-3" />
+                    )}
+                  </Button>
                 </CardTitle>
+                {/* Published Badge */}
+                {isPublished && (
+                  <Badge variant="outline" className="text-[10px] bg-primary/20 text-primary border-primary/30">
+                    Published
+                  </Badge>
+                )}
                 {/* Format Badge */}
                 <Badge variant="outline" className={`text-[10px] ${getFormatColor(deck.format || 'casual')}`}>
                   {formatLabels[deck.format || 'casual']}
