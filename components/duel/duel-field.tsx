@@ -321,7 +321,7 @@ export function DuelField({
     <div className="w-full h-full flex flex-col">
       {/* Main Field Mat - seamless DSOD background */}
       <div 
-        className="flex-1 relative overflow-hidden"
+        className="flex-1 relative overflow-hidden max-h-[65vh]"
         style={{
           background: 'transparent',
         }}
@@ -338,10 +338,10 @@ export function DuelField({
         />
 
         {/* Content Container */}
-        <div className="absolute inset-0 flex flex-col p-3">
+        <div className="absolute inset-0 flex flex-col p-2 overflow-y-auto">
           
           {/* Opponent Side */}
-          <div className="flex-1 flex flex-col justify-start gap-1">
+          <div className="flex-shrink-0 flex flex-col justify-start gap-0.5">
             
             {/* Opponent Info Bar */}
             <div className="flex items-center justify-between px-2 py-1">
@@ -364,7 +364,7 @@ export function DuelField({
 
             {/* Opponent Hand (face-down cards shown at top) */}
             <div 
-              className="flex justify-center gap-1 py-2 px-4 rounded-lg mx-4 mb-1"
+              className="flex justify-center gap-0.5 py-1 px-2 rounded-lg mx-2 mb-0.5"
               style={{
                 background: 'linear-gradient(to bottom, rgba(200, 100, 0, 0.15), transparent)',
               }}
@@ -454,7 +454,7 @@ export function DuelField({
           </div>
 
           {/* Center Divider with Extra Monster Zones */}
-          <div className="flex items-center justify-center py-2 relative">
+          <div className="flex items-center justify-center py-1 relative">
             <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
             <div className="flex gap-[200px] relative z-10">
               {renderExtraMonsterZone('left')}
@@ -473,7 +473,7 @@ export function DuelField({
           </div>
 
           {/* My Side */}
-          <div className="flex-1 flex flex-col justify-end gap-1">
+          <div className="flex-shrink-0 flex flex-col justify-end gap-0.5">
             
             {/* My Field Layout */}
             <div className="flex justify-center items-center gap-2">
@@ -575,7 +575,7 @@ export function DuelField({
 
             {/* My Hand */}
             <div 
-              className="flex justify-center gap-1 py-3 px-4 rounded-lg mx-4 relative"
+              className="flex justify-center gap-0.5 py-1 px-2 rounded-lg mx-2 relative"
               style={{
                 background: 'linear-gradient(to top, rgba(0, 100, 200, 0.2), transparent)',
               }}
