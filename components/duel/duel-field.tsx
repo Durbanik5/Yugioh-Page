@@ -15,7 +15,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { 
-  Layers, Flame, Ban, RotateCcw, Eye, Shuffle, Sparkles, Heart, Plus
+  Layers, Flame, Ban, RotateCcw, Eye, Sparkles, Heart, Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -29,7 +29,6 @@ import {
   banishCard,
   returnToDeck,
   updateCounters,
-  shuffleDeck,
 } from '@/lib/duel-actions'
 import type { DuelGameCard, CardPosition, Player, DuelRoom } from '@/lib/types'
 
@@ -208,16 +207,6 @@ export function DuelField({
       toast.error(result.error || 'Failed')
     }
   }, [onCardsChanged])
-  
-  const handleShuffleDeck = useCallback(async () => {
-    const result = await shuffleDeck(room.id, myPlayerId)
-    if (result.success) {
-      toast.success('Shuffled deck')
-      onCardsChanged()
-    } else {
-      toast.error(result.error || 'Failed to shuffle')
-    }
-  }, [room.id, myPlayerId, onCardsChanged])
 
   // Handle special summon from various locations
   const handleSpecialSummon = useCallback(async (card: DuelGameCard, position: CardPosition) => {
@@ -561,14 +550,9 @@ export function DuelField({
                 <div className="flex items-center gap-1 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/50">
                   <Heart className="h-3 w-3 text-cyan-500" />
                   <span className="text-sm font-bold text-cyan-400">{myLifePoints}</span>
-                </div>
-              </div>
-              <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2 border-slate-700/50" onClick={handleShuffleDeck}>
-                <Shuffle className="h-3 w-3" />
-              </Button>
-              </div>
-            </div>
+          </div>
+          </div>
+          </div>
 
             {/* My Hand */}
             <div 
