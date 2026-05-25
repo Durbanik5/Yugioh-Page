@@ -4,18 +4,15 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { 
   Sword, Shield, Flame, Send, RotateCcw, 
-  Eye, EyeOff, Plus, Minus, Sparkles, Ban
+  Eye, EyeOff, Plus, Minus, Ban, ChevronRight
 } from 'lucide-react'
 import type { DuelGameCard, CardPosition } from '@/lib/types'
 
@@ -32,7 +29,6 @@ interface DuelCardProps {
   onChangePosition?: (position: CardPosition) => void
   onSendToGraveyard?: () => void
   onBanish?: (faceDown?: boolean) => void
-  onReturnToHand?: () => void
   onReturnToDeck?: (toTop?: boolean) => void
   onAddCounter?: () => void
   onRemoveCounter?: () => void
@@ -61,7 +57,6 @@ export function DuelCard({
   onChangePosition,
   onSendToGraveyard,
   onBanish,
-  onReturnToHand,
   onReturnToDeck,
   onAddCounter,
   onRemoveCounter,
@@ -71,6 +66,11 @@ export function DuelCard({
   className,
 }: DuelCardProps) {
   const [imageError, setImageError] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const [showSummonOptions, setShowSummonOptions] = useState(false)
+  const [showPositionOptions, setShowPositionOptions] = useState(false)
+  const [showBanishOptions, setShowBanishOptions] = useState(false)
+  const [showDeckOptions, setShowDeckOptions] = useState(false)
 
   const showCardBack = isHidden || 
     (!isOwner && card.location === 'hand') ||
@@ -86,11 +86,19 @@ export function DuelCard({
       ? `https://images.ygoprodeck.com/images/cards_small/${card.card_id}.jpg`
       : '/images/card-back.jpg'
 
-  // Check card types - 'monster' is the generic type, others are specific extra deck types
+  // Check card types
   const isMonster = ['monster', 'fusion', 'synchro', 'xyz', 'link', 'pendulum', 'normal_monster', 'effect_monster'].includes(card.card_type)
   const isMainDeckMonster = card.card_type === 'monster' || card.card_type === 'normal_monster' || card.card_type === 'effect_monster'
-  const isExtraDeckMonster = ['fusion', 'synchro', 'xyz', 'link', 'pendulum'].includes(card.card_type)
   const isSpellTrap = ['spell', 'trap'].includes(card.card_type)
+
+  const handleAction = (action: () => void) => {
+    action()
+    setIsOpen(false)
+    setShowSummonOptions(false)
+    setShowPositionOptions(false)
+    setShowBanishOptions(false)
+    setShowDeckOptions(false)
+  }
 
   const cardContent = (
     <div
@@ -103,7 +111,6 @@ export function DuelCard({
         !disabled && 'hover:scale-105 hover:z-10',
         className
       )}
-      onClick={disabled ? undefined : onClick}
     >
       <Image
         src={imageUrl}
@@ -138,197 +145,303 @@ export function DuelCard({
     </div>
   )
 
-  // If no actions or not owner, just return the card
+  // If no actions or not owner, just return the card with onClick
   if (!showActions || !isOwner) {
-    return cardContent
+    return (
+      <div onClick={disabled ? undefined : onClick}>
+        {cardContent}
+      </div>
+    )
   }
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild disabled={disabled}>
+    <Popover open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open)
+      if (!open) {
+        setShowSummonOptions(false)
+        setShowPositionOptions(false)
+        setShowBanishOptions(false)
+        setShowDeckOptions(false)
+      }
+    }}>
+      <PopoverTrigger asChild disabled={disabled}>
         {cardContent}
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-48">
-        <div className="px-2 py-1 text-xs font-medium text-muted-foreground truncate">
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-1" align="start">
+        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground truncate border-b mb-1">
           {card.card_name}
         </div>
-        <ContextMenuSeparator />
 
         {/* Hand actions - following official Yu-Gi-Oh! rules */}
         {card.location === 'hand' && (
-          <>
-            {/* Normal Summon/Set for main deck monsters only */}
-            {isMainDeckMonster && onSummon && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>
-                  <Sword className="mr-2 h-4 w-4" />
+          <div className="space-y-0.5">
+            {/* Normal Summon for main deck monsters */}
+            {isMainDeckMonster && onSummon && !showSummonOptions && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-between h-8 text-xs"
+                onClick={() => setShowSummonOptions(true)}
+              >
+                <span className="flex items-center">
+                  <Sword className="mr-2 h-3.5 w-3.5" />
                   Normal Summon
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent>
-                  <ContextMenuItem onClick={() => onSummon('face_up_attack')}>
-                    <Sword className="mr-2 h-4 w-4" />
-                    Attack Position
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => onSummon('face_up_defense')}>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Defense Position
-                  </ContextMenuItem>
-                </ContextMenuSubContent>
-              </ContextMenuSub>
+                </span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {isMainDeckMonster && onSummon && showSummonOptions && (
+              <div className="pl-2 space-y-0.5 border-l-2 border-primary/50 ml-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-8 text-xs"
+                  onClick={() => handleAction(() => onSummon('face_up_attack'))}
+                >
+                  <Sword className="mr-2 h-3.5 w-3.5" />
+                  Attack Position
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-8 text-xs"
+                  onClick={() => handleAction(() => onSummon('face_up_defense'))}
+                >
+                  <Shield className="mr-2 h-3.5 w-3.5" />
+                  Defense Position
+                </Button>
+              </div>
             )}
             {/* Set monster (face-down defense) */}
             {isMainDeckMonster && onSummon && (
-              <ContextMenuItem onClick={() => onSummon('face_down_defense')}>
-                <EyeOff className="mr-2 h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={() => handleAction(() => onSummon('face_down_defense'))}
+              >
+                <EyeOff className="mr-2 h-3.5 w-3.5" />
                 Set Monster
-              </ContextMenuItem>
+              </Button>
             )}
             {/* Spell/Trap actions */}
-            {isSpellTrap && (
-              <>
-                {onSetSpellTrap && (
-                  <ContextMenuItem onClick={onSetSpellTrap}>
-                    <EyeOff className="mr-2 h-4 w-4" />
-                    Set
-                  </ContextMenuItem>
-                )}
-                {card.card_type === 'spell' && onActivate && (
-                  <ContextMenuItem onClick={onActivate}>
-                    <Flame className="mr-2 h-4 w-4" />
-                    Activate (Quick-Play/Normal Spell)
-                  </ContextMenuItem>
-                )}
-              </>
+            {isSpellTrap && onSetSpellTrap && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={() => handleAction(onSetSpellTrap)}
+              >
+                <EyeOff className="mr-2 h-3.5 w-3.5" />
+                Set
+              </Button>
             )}
-          </>
+            {card.card_type === 'spell' && onActivate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={() => handleAction(onActivate)}
+              >
+                <Flame className="mr-2 h-3.5 w-3.5" />
+                Activate
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Field actions for monsters */}
         {card.location === 'monster_zone' && (
-          <>
+          <div className="space-y-0.5">
             {isFaceDown && onFlip && (
-              <ContextMenuItem onClick={onFlip}>
-                <Eye className="mr-2 h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={() => handleAction(onFlip)}
+              >
+                <Eye className="mr-2 h-3.5 w-3.5" />
                 Flip Summon
-              </ContextMenuItem>
+              </Button>
             )}
-            {!isFaceDown && onChangePosition && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>
-                  <RotateCcw className="mr-2 h-4 w-4" />
+            {!isFaceDown && onChangePosition && !showPositionOptions && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-between h-8 text-xs"
+                onClick={() => setShowPositionOptions(true)}
+              >
+                <span className="flex items-center">
+                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
                   Change Position
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent>
-                  {card.position !== 'face_up_attack' && (
-                    <ContextMenuItem onClick={() => onChangePosition('face_up_attack')}>
-                      <Sword className="mr-2 h-4 w-4" />
-                      Attack Position
-                    </ContextMenuItem>
-                  )}
-                  {card.position !== 'face_up_defense' && (
-                    <ContextMenuItem onClick={() => onChangePosition('face_up_defense')}>
-                      <Shield className="mr-2 h-4 w-4" />
-                      Defense Position
-                    </ContextMenuItem>
-                  )}
-                </ContextMenuSubContent>
-              </ContextMenuSub>
+                </span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
             )}
-          </>
+            {!isFaceDown && onChangePosition && showPositionOptions && (
+              <div className="pl-2 space-y-0.5 border-l-2 border-primary/50 ml-2">
+                {card.position !== 'face_up_attack' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-xs"
+                    onClick={() => handleAction(() => onChangePosition('face_up_attack'))}
+                  >
+                    <Sword className="mr-2 h-3.5 w-3.5" />
+                    Attack Position
+                  </Button>
+                )}
+                {card.position !== 'face_up_defense' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-xs"
+                    onClick={() => handleAction(() => onChangePosition('face_up_defense'))}
+                  >
+                    <Shield className="mr-2 h-3.5 w-3.5" />
+                    Defense Position
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Field actions for spell/trap */}
         {card.location === 'spell_zone' && isFaceDown && onActivate && (
-          <ContextMenuItem onClick={onActivate}>
-            <Flame className="mr-2 h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start h-8 text-xs"
+            onClick={() => handleAction(onActivate)}
+          >
+            <Flame className="mr-2 h-3.5 w-3.5" />
             Activate
-          </ContextMenuItem>
+          </Button>
         )}
 
-        <ContextMenuSeparator />
-
-        {/* Field actions - only for cards on the field, not in hand */}
+        {/* Field actions - only for cards on the field */}
         {card.location !== 'hand' && (
           <>
-            {onSendToGraveyard && (
-              <ContextMenuItem onClick={onSendToGraveyard}>
-                <Send className="mr-2 h-4 w-4" />
-                Send to Graveyard
-              </ContextMenuItem>
-            )}
-            
-            {onBanish && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>
-                  <Ban className="mr-2 h-4 w-4" />
-                  Banish
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent>
-                  <ContextMenuItem onClick={() => onBanish(false)}>
-                    <Eye className="mr-2 h-4 w-4" />
+            <Separator className="my-1" />
+            <div className="space-y-0.5">
+              {onSendToGraveyard && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-8 text-xs"
+                  onClick={() => handleAction(onSendToGraveyard)}
+                >
+                  <Send className="mr-2 h-3.5 w-3.5" />
+                  Send to Graveyard
+                </Button>
+              )}
+              
+              {onBanish && !showBanishOptions && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between h-8 text-xs"
+                  onClick={() => setShowBanishOptions(true)}
+                >
+                  <span className="flex items-center">
+                    <Ban className="mr-2 h-3.5 w-3.5" />
+                    Banish
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {onBanish && showBanishOptions && (
+                <div className="pl-2 space-y-0.5 border-l-2 border-primary/50 ml-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-xs"
+                    onClick={() => handleAction(() => onBanish(false))}
+                  >
+                    <Eye className="mr-2 h-3.5 w-3.5" />
                     Face-up
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => onBanish(true)}>
-                    <EyeOff className="mr-2 h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-xs"
+                    onClick={() => handleAction(() => onBanish(true))}
+                  >
+                    <EyeOff className="mr-2 h-3.5 w-3.5" />
                     Face-down
-                  </ContextMenuItem>
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-            )}
+                  </Button>
+                </div>
+              )}
 
-            {onReturnToHand && (
-              <ContextMenuItem onClick={onReturnToHand}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Return to Hand
-              </ContextMenuItem>
-            )}
-
-            {onReturnToDeck && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Return to Deck
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent>
-                  <ContextMenuItem onClick={() => onReturnToDeck(true)}>
+              {onReturnToDeck && !showDeckOptions && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between h-8 text-xs"
+                  onClick={() => setShowDeckOptions(true)}
+                >
+                  <span className="flex items-center">
+                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                    Return to Deck
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {onReturnToDeck && showDeckOptions && (
+                <div className="pl-2 space-y-0.5 border-l-2 border-primary/50 ml-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-xs"
+                    onClick={() => handleAction(() => onReturnToDeck(true))}
+                  >
                     Top of Deck
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => onReturnToDeck(false)}>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-xs"
+                    onClick={() => handleAction(() => onReturnToDeck(false))}
+                  >
                     Shuffle into Deck
-                  </ContextMenuItem>
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-            )}
+                  </Button>
+                </div>
+              )}
+            </div>
           </>
         )}
 
-        <ContextMenuSeparator />
-
         {/* Counter actions */}
+        <Separator className="my-1" />
         <div className="flex items-center justify-between px-2 py-1">
           <span className="text-xs text-muted-foreground">Counters: {card.counters}</span>
           <div className="flex gap-1">
             {onRemoveCounter && (
-              <button 
-                onClick={onRemoveCounter}
-                className="p-1 hover:bg-muted rounded"
+              <Button 
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleAction(onRemoveCounter)}
                 disabled={card.counters === 0}
               >
                 <Minus className="h-3 w-3" />
-              </button>
+              </Button>
             )}
             {onAddCounter && (
-              <button 
-                onClick={onAddCounter}
-                className="p-1 hover:bg-muted rounded"
+              <Button 
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handleAction(onAddCounter)}
               >
                 <Plus className="h-3 w-3" />
-              </button>
+              </Button>
             )}
           </div>
         </div>
-      </ContextMenuContent>
-    </ContextMenu>
+      </PopoverContent>
+    </Popover>
   )
 }
 

@@ -26,7 +26,6 @@ import {
   changePosition,
   sendToGraveyard,
   banishCard,
-  returnToHand,
   returnToDeck,
   updateCounters,
   shuffleDeck,
@@ -211,17 +210,7 @@ export function DuelField({
       toast.error(result.error || 'Failed')
     }
   }, [onCardsChanged])
-
-  const handleReturnToHand = useCallback(async (card: DuelGameCard) => {
-    const result = await returnToHand(card.id)
-    if (result.success) {
-      toast.success(`Returned ${card.card_name} to hand`)
-      onCardsChanged()
-    } else {
-      toast.error(result.error || 'Failed')
-    }
-  }, [onCardsChanged])
-
+  
   const handleShuffleDeck = useCallback(async () => {
     const result = await shuffleDeck(room.id, myPlayerId)
     if (result.success) {
@@ -280,7 +269,6 @@ export function DuelField({
           onChangePosition={(pos) => handleChangePosition(card, pos)}
           onSendToGraveyard={() => handleSendToGraveyard(card)}
           onBanish={() => handleBanish(card)}
-          onReturnToHand={() => handleReturnToHand(card)}
         />
       )
     }
@@ -645,7 +633,6 @@ export function DuelField({
                   isOwner={graveyardOpen === 'mine'}
                   size="md"
                   showActions={graveyardOpen === 'mine'}
-                  onReturnToHand={graveyardOpen === 'mine' ? () => handleReturnToHand(card) : undefined}
                   onBanish={graveyardOpen === 'mine' ? () => handleBanish(card) : undefined}
                 />
               ))}
@@ -677,7 +664,6 @@ export function DuelField({
                   isOwner={banishedOpen === 'mine'}
                   size="md"
                   showActions={banishedOpen === 'mine'}
-                  onReturnToHand={banishedOpen === 'mine' ? () => handleReturnToHand(card) : undefined}
                 />
               ))}
               {(banishedOpen === 'mine' ? organizedCards.my.banished : organizedCards.opponent.banished).length === 0 && (
