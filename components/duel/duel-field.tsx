@@ -4,6 +4,8 @@ import { useState, useMemo, useCallback } from 'react'
 import { DuelCard, EmptyZone } from './duel-card'
 import { CardInfoPanel } from './card-info-panel'
 import { ChainPrompt } from './chain-prompt'
+import { PhaseBar } from './phase-bar'
+import { TributeSelectionModal } from './tribute-selection-modal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -18,17 +20,15 @@ import {
   Layers, Flame, Ban, RotateCcw, Eye, Sparkles, Heart, Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useDuelEngine } from '@/hooks/use-duel-engine'
 import {
-  summonMonster,
-  setSpellTrap,
-  activateSpellTrap,
-  activateFieldSpell,
   flipCard,
   changePosition,
   sendToGraveyard,
   banishCard,
   returnToDeck,
   updateCounters,
+  activateFieldSpell,
 } from '@/lib/duel-actions'
 import type { DuelGameCard, CardPosition, Player, DuelRoom } from '@/lib/types'
 
@@ -57,6 +57,26 @@ export function DuelField({
   isMyTurn,
   onCardsChanged,
 }: DuelFieldProps) {
+  // Use the duel engine for rule enforcement
+  const {
+    gameState,
+    isLoading: engineLoading,
+    isMyTurn: engineIsMyTurn,
+    hasNormalSummoned,
+    pendingTributeAction,
+    selectedTributes,
+    selectTribute,
+    confirmTributeSummon,
+    cancelTributeSummon,
+    validateNormalSummon,
+    executeNormalSummon,
+    validateSpellTrapActivation,
+    executeSpellTrapActivation,
+    setSpellTrap: engineSetSpellTrap,
+    changePhase,
+    startDuel,
+  } = useDuelEngine({ room, myPlayerId, allCards, onCardsChanged })
+
   const [selectedCard, setSelectedCard] = useState<DuelGameCard | null>(null)
   const [selectingZone, setSelectingZone] = useState<'monster' | 'spell' | null>(null)
   const [pendingAction, setPendingAction] = useState<{
@@ -112,11 +132,19 @@ export function DuelField({
     }
   }, [allCards, myPlayerId, opponentPlayerId])
 
-  // Card action handlers
+  // Card action handlers - using the duel engine for rule enforcement
   const handleSummon = useCallback(async (card: DuelGameCard, position: 'face_up_attack' | 'face_up_defense' | 'face_down_defense') => {
-    setPendingAction({ type: 'summon', card, position })
-    setSelectingZone('monster')
-  }, [])
+    // Validate the summon first
+    const validation = validateNormalSummon(card)
+    
+    if (!validation.valid) {
+      toast.error(validation.reason)
+      return
+    }
+    
+    // Execute the summon (engine handles tribute requirements)
+    await executeNormalSummon(card, position)
+  }, [validateNormalSummon, executeNormalSummon])
 
   const handleZoneSelect = useCallback(async (zoneIndex: number) => {
     if (!pendingAction) return
@@ -149,14 +177,19 @@ export function DuelField({
   }, [pendingAction, onCardsChanged])
 
   const handleSetSpell = useCallback(async (card: DuelGameCard) => {
-    setPendingAction({ type: 'set_spell', card })
-    setSelectingZone('spell')
-  }, [])
+    await engineSetSpellTrap(card)
+  }, [engineSetSpellTrap])
 
   const handleActivate = useCallback(async (card: DuelGameCard) => {
-    setPendingAction({ type: 'activate', card })
-    setSelectingZone('spell')
-  }, [])
+    // Validate first
+    const validation = validateSpellTrapActivation(card)
+    if (!validation.valid) {
+      toast.error(validation.reason)
+      return
+    }
+    
+    await executeSpellTrapActivation(card)
+  }, [validateSpellTrapActivation, executeSpellTrapActivation])
 
   const handleActivateField = useCallback(async (card: DuelGameCard) => {
     const result = await activateFieldSpell(card.id)
@@ -482,13 +515,26 @@ export function DuelField({
             <Badge 
               className={cn(
                 "absolute left-4 px-3 py-1",
-                isMyTurn 
-                  ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30" 
+                engineIsMyTurn
+                  ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30"
                   : "bg-slate-800 text-slate-400"
               )}
             >
-              {isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"}
+              {engineIsMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"}
             </Badge>
+            
+            {/* Phase Bar */}
+            {gameState && (
+              <div className="absolute left-1/2 -translate-x-1/2">
+                <PhaseBar
+                  currentPhase={gameState.phase}
+                  isMyTurn={engineIsMyTurn}
+                  turnCount={gameState.turnCount}
+                  onPhaseChange={changePhase}
+                  battlePhaseEnabled={gameState.battlePhaseEnabled}
+                />
+              </div>
+            )}
           </div>
 
           {/* My Side */}
@@ -716,6 +762,20 @@ export function DuelField({
       {/* Card Info Panel - shows when hovering over cards */}
       {hoveredCard && (
         <CardInfoPanel card={hoveredCard} />
+      )}
+
+      {/* Tribute Selection Modal */}
+      {pendingTributeAction && (
+        <TributeSelectionModal
+          isOpen={true}
+          onClose={cancelTributeSummon}
+          cardToSummon={pendingTributeAction.card}
+          requiredTributes={pendingTributeAction.requiredTributes}
+          availableMonsters={organizedCards.my.monsterZones.filter((c): c is DuelGameCard => c !== null)}
+          selectedTributes={selectedTributes}
+          onSelectTribute={selectTribute}
+          onConfirm={confirmTributeSummon}
+        />
       )}
     </div>
   )
