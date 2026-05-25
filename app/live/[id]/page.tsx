@@ -545,10 +545,25 @@ function SpectatorScreen({
       </div>
 
       {/* Match Type Badge */}
-      <div className="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700">
-        <span className="text-xs text-cyan-400 font-medium" style={{ fontFamily: 'var(--font-orbitron)' }}>
-          {room.match_type === '1v1' ? '1v1 DUEL' : room.match_type === 'free_for_all' ? 'FREE-FOR-ALL' : 'TAG TEAM'}
-        </span>
+      <div className="absolute bottom-4 right-4 flex items-center gap-2">
+        <div className={`px-3 py-1.5 rounded-lg border ${
+          room.format === 'tcg' ? 'bg-blue-500/20 border-blue-500/50' :
+          room.format === 'ocg' ? 'bg-red-500/20 border-red-500/50' :
+          'bg-green-500/20 border-green-500/50'
+        }`}>
+          <span className={`text-xs font-bold ${
+            room.format === 'tcg' ? 'text-blue-400' :
+            room.format === 'ocg' ? 'text-red-400' :
+            'text-green-400'
+          }`}>
+            {room.format === 'tcg' ? 'TCG' : room.format === 'ocg' ? 'OCG' : 'CASUAL'}
+          </span>
+        </div>
+        <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700">
+          <span className="text-xs text-cyan-400 font-medium" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            {room.match_type === '1v1' ? '1v1 DUEL' : room.match_type === 'free_for_all' ? 'FREE-FOR-ALL' : 'TAG TEAM'}
+          </span>
+        </div>
       </div>
     </div>
   )

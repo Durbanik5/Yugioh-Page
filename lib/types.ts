@@ -31,10 +31,12 @@ export interface DeckChange {
 }
 
 export type MatchType = '1v1' | 'free_for_all' | 'tag_team'
+export type DuelFormat = 'tcg' | 'ocg' | 'casual'
 
 export interface Match {
   id: string
   match_type: MatchType
+  format: DuelFormat
   played_at: string
   notes: string | null
 }
@@ -134,6 +136,7 @@ export interface DuelRoom {
   name: string
   status: DuelRoomStatus
   match_type: MatchType
+  format: DuelFormat
   stream_url: string | null
   created_by: string | null
   winner_id: string | null

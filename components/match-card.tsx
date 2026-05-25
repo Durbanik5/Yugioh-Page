@@ -55,6 +55,18 @@ function getMatchTypeLabel(type: string) {
   }
 }
 
+function getFormatBadge(format: string | undefined) {
+  switch (format) {
+    case 'tcg':
+      return { label: 'TCG', className: 'bg-blue-500 hover:bg-blue-600 text-white' }
+    case 'ocg':
+      return { label: 'OCG', className: 'bg-red-500 hover:bg-red-600 text-white' }
+    case 'casual':
+    default:
+      return { label: 'Casual', className: 'bg-green-500 hover:bg-green-600 text-white' }
+  }
+}
+
 export function MatchCard({ 
   match, 
   currentPlayerId, 
@@ -194,6 +206,9 @@ export function MatchCard({
               <Badge variant="outline" className="flex items-center gap-1.5 border-primary/50">
                 {getMatchTypeIcon(match.match_type)}
                 {getMatchTypeLabel(match.match_type)}
+              </Badge>
+              <Badge className={getFormatBadge(match.format).className}>
+                {getFormatBadge(match.format).label}
               </Badge>
               <span className="text-sm text-muted-foreground">
                 {new Date(match.played_at).toLocaleDateString(undefined, {

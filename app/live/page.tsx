@@ -18,7 +18,7 @@ import {
   ArrowRight, Zap, UserPlus
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Player, DuelRoom, MatchType } from '@/lib/types'
+import type { Player, DuelRoom, MatchType, DuelFormat } from '@/lib/types'
 
 export default function LiveDuelsPage() {
   const router = useRouter()
@@ -31,6 +31,7 @@ export default function LiveDuelsPage() {
   // Create room form
   const [roomName, setRoomName] = useState('')
   const [matchType, setMatchType] = useState<MatchType>('1v1')
+  const [format, setFormat] = useState<DuelFormat>('casual')
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [streamUrl, setStreamUrl] = useState('')
   const [creating, setCreating] = useState(false)
@@ -116,6 +117,7 @@ export default function LiveDuelsPage() {
         room_code: roomCode,
         name: roomName.trim(),
         match_type: matchType,
+        format: format,
         stream_url: streamUrl.trim() || null,
         created_by: selectedPlayer,
       })
@@ -249,6 +251,35 @@ export default function LiveDuelsPage() {
                   </div>
 
                   <div>
+                    <Label className="text-muted-foreground">Duel Format</Label>
+                    <Select value={format} onValueChange={(v) => setFormat(v as DuelFormat)}>
+                      <SelectTrigger className="bg-input border-border mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="casual">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            Casual (No banlist)
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="tcg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                            TCG Format
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="ocg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            OCG Format
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
                     <Label className="text-muted-foreground">Stream URL (optional)</Label>
                     <Input
                       value={streamUrl}
@@ -366,6 +397,13 @@ function RoomCard({ room }: { room: DuelRoom & { participants: any[]; creator: P
             <Swords className="h-4 w-4" />
             {room.match_type === '1v1' ? '1v1' : room.match_type === 'free_for_all' ? 'FFA' : 'Tag'}
           </span>
+          <Badge className={
+            room.format === 'tcg' ? 'bg-blue-500 hover:bg-blue-600 text-white' :
+            room.format === 'ocg' ? 'bg-red-500 hover:bg-red-600 text-white' :
+            'bg-green-500 hover:bg-green-600 text-white'
+          }>
+            {room.format === 'tcg' ? 'TCG' : room.format === 'ocg' ? 'OCG' : 'Casual'}
+          </Badge>
           <span className="flex items-center gap-1">
             <Users className="h-4 w-4" />
             {duelists.length} duelist{duelists.length !== 1 ? 's' : ''}

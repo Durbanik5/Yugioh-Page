@@ -17,7 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { Swords, Users, Layers, Plus, X, Trophy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Player, Deck, MatchType } from '@/lib/types'
+import type { Player, Deck, MatchType, DuelFormat } from '@/lib/types'
 
 interface PlayerWithDecks extends Player {
   decks: Deck[]
@@ -41,8 +41,15 @@ const MATCH_TYPES: { value: MatchType; label: string; icon: React.ReactNode; min
   { value: 'tag_team', label: 'Tag Team', icon: <Layers className="h-4 w-4" />, minPlayers: 4 },
 ]
 
+const DUEL_FORMATS: { value: DuelFormat; label: string; description: string; color: string }[] = [
+  { value: 'casual', label: 'Casual', description: 'No banlist restrictions', color: 'bg-green-500' },
+  { value: 'tcg', label: 'TCG', description: 'TCG banlist rules', color: 'bg-blue-500' },
+  { value: 'ocg', label: 'OCG', description: 'OCG banlist rules', color: 'bg-red-500' },
+]
+
 export function RecordMatchForm({ players }: RecordMatchFormProps) {
   const [matchType, setMatchType] = useState<MatchType>('1v1')
+  const [format, setFormat] = useState<DuelFormat>('casual')
   const [participants, setParticipants] = useState<Participant[]>([
     { playerId: '', deckId: null, teamNumber: 1, isWinner: false, placement: null },
     { playerId: '', deckId: null, teamNumber: 2, isWinner: false, placement: null },
@@ -165,6 +172,7 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
         .from('matches')
         .insert({
           match_type: matchType,
+          format: format,
           notes: notes.trim() || null,
         })
         .select()
@@ -273,6 +281,39 @@ export function RecordMatchForm({ players }: RecordMatchFormProps) {
                 </div>
                 <span className={`text-sm font-medium ${matchType === type.value ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {type.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Duel Format Selection */}
+      <Card className="bg-card border-primary/30 kaiba-border">
+        <CardHeader>
+          <CardTitle className="text-lg" style={{ fontFamily: 'var(--font-orbitron)' }}>
+            Duel Format
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-3">
+            {DUEL_FORMATS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setFormat(f.value)}
+                className={`p-4 rounded-lg border transition-all flex flex-col items-center gap-2 ${
+                  format === f.value
+                    ? 'border-primary bg-primary/10 kaiba-glow'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className={`w-3 h-3 rounded-full ${f.color}`} />
+                <span className={`text-sm font-medium ${format === f.value ? 'text-foreground' : 'text-muted-foreground'}`}>
+                  {f.label}
+                </span>
+                <span className="text-xs text-muted-foreground text-center">
+                  {f.description}
                 </span>
               </button>
             ))}
