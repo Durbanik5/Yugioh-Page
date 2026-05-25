@@ -86,7 +86,10 @@ export function DuelCard({
       ? `https://images.ygoprodeck.com/images/cards_small/${card.card_id}.jpg`
       : '/images/card-back.jpg'
 
-  const isMonster = ['monster', 'fusion', 'synchro', 'xyz', 'link', 'pendulum'].includes(card.card_type)
+  // Check card types - 'monster' is the generic type, others are specific extra deck types
+  const isMonster = ['monster', 'fusion', 'synchro', 'xyz', 'link', 'pendulum', 'normal_monster', 'effect_monster'].includes(card.card_type)
+  const isMainDeckMonster = card.card_type === 'monster' || card.card_type === 'normal_monster' || card.card_type === 'effect_monster'
+  const isExtraDeckMonster = ['fusion', 'synchro', 'xyz', 'link', 'pendulum'].includes(card.card_type)
   const isSpellTrap = ['spell', 'trap'].includes(card.card_type)
 
   const cardContent = (
@@ -151,14 +154,15 @@ export function DuelCard({
         </div>
         <ContextMenuSeparator />
 
-        {/* Hand actions */}
+        {/* Hand actions - following official Yu-Gi-Oh! rules */}
         {card.location === 'hand' && (
           <>
-            {isMonster && onSummon && (
+            {/* Normal Summon/Set for main deck monsters only */}
+            {isMainDeckMonster && onSummon && (
               <ContextMenuSub>
                 <ContextMenuSubTrigger>
                   <Sword className="mr-2 h-4 w-4" />
-                  Summon
+                  Normal Summon
                 </ContextMenuSubTrigger>
                 <ContextMenuSubContent>
                   <ContextMenuItem onClick={() => onSummon('face_up_attack')}>
@@ -169,25 +173,29 @@ export function DuelCard({
                     <Shield className="mr-2 h-4 w-4" />
                     Defense Position
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => onSummon('face_down_defense')}>
-                    <EyeOff className="mr-2 h-4 w-4" />
-                    Set (Face-down)
-                  </ContextMenuItem>
                 </ContextMenuSubContent>
               </ContextMenuSub>
             )}
+            {/* Set monster (face-down defense) */}
+            {isMainDeckMonster && onSummon && (
+              <ContextMenuItem onClick={() => onSummon('face_down_defense')}>
+                <EyeOff className="mr-2 h-4 w-4" />
+                Set Monster
+              </ContextMenuItem>
+            )}
+            {/* Spell/Trap actions */}
             {isSpellTrap && (
               <>
-                {onActivate && (
-                  <ContextMenuItem onClick={onActivate}>
-                    <Flame className="mr-2 h-4 w-4" />
-                    Activate
-                  </ContextMenuItem>
-                )}
                 {onSetSpellTrap && (
                   <ContextMenuItem onClick={onSetSpellTrap}>
                     <EyeOff className="mr-2 h-4 w-4" />
                     Set
+                  </ContextMenuItem>
+                )}
+                {card.card_type === 'spell' && onActivate && (
+                  <ContextMenuItem onClick={onActivate}>
+                    <Flame className="mr-2 h-4 w-4" />
+                    Activate (Quick-Play/Normal Spell)
                   </ContextMenuItem>
                 )}
               </>
@@ -239,55 +247,59 @@ export function DuelCard({
 
         <ContextMenuSeparator />
 
-        {/* Universal actions */}
-        {onSendToGraveyard && (
-          <ContextMenuItem onClick={onSendToGraveyard}>
-            <Send className="mr-2 h-4 w-4" />
-            Send to Graveyard
-          </ContextMenuItem>
-        )}
-        
-        {onBanish && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <Ban className="mr-2 h-4 w-4" />
-              Banish
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              <ContextMenuItem onClick={() => onBanish(false)}>
-                <Eye className="mr-2 h-4 w-4" />
-                Face-up
+        {/* Field actions - only for cards on the field, not in hand */}
+        {card.location !== 'hand' && (
+          <>
+            {onSendToGraveyard && (
+              <ContextMenuItem onClick={onSendToGraveyard}>
+                <Send className="mr-2 h-4 w-4" />
+                Send to Graveyard
               </ContextMenuItem>
-              <ContextMenuItem onClick={() => onBanish(true)}>
-                <EyeOff className="mr-2 h-4 w-4" />
-                Face-down
-              </ContextMenuItem>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        )}
+            )}
+            
+            {onBanish && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <Ban className="mr-2 h-4 w-4" />
+                  Banish
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  <ContextMenuItem onClick={() => onBanish(false)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Face-up
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => onBanish(true)}>
+                    <EyeOff className="mr-2 h-4 w-4" />
+                    Face-down
+                  </ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )}
 
-        {onReturnToHand && (
-          <ContextMenuItem onClick={onReturnToHand}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Return to Hand
-          </ContextMenuItem>
-        )}
+            {onReturnToHand && (
+              <ContextMenuItem onClick={onReturnToHand}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Return to Hand
+              </ContextMenuItem>
+            )}
 
-        {onReturnToDeck && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Return to Deck
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              <ContextMenuItem onClick={() => onReturnToDeck(true)}>
-                Top of Deck
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => onReturnToDeck(false)}>
-                Shuffle into Deck
-              </ContextMenuItem>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
+            {onReturnToDeck && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Return to Deck
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  <ContextMenuItem onClick={() => onReturnToDeck(true)}>
+                    Top of Deck
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => onReturnToDeck(false)}>
+                    Shuffle into Deck
+                  </ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )}
+          </>
         )}
 
         <ContextMenuSeparator />

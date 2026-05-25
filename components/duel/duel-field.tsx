@@ -272,12 +272,12 @@ export function DuelField({
           card={card}
           isOwner={isOwner}
           size="md"
-          onSummon={handleSummon}
-          onSetSpell={handleSetSpell}
-          onActivate={handleActivate}
-          onActivateField={handleActivateField}
-          onFlip={handleFlip}
-          onChangePosition={handleChangePosition}
+          onSummon={(position) => handleSummon(card, position)}
+          onSetSpellTrap={() => handleSetSpell(card)}
+          onActivate={() => handleActivate(card)}
+          onActivateField={() => handleActivateField(card)}
+          onFlip={() => handleFlip(card)}
+          onChangePosition={(pos) => handleChangePosition(card, pos)}
           onSendToGraveyard={() => handleSendToGraveyard(card)}
           onBanish={() => handleBanish(card)}
           onReturnToHand={() => handleReturnToHand(card)}
@@ -590,11 +590,10 @@ export function DuelField({
                         isOwner={true}
                         size="md"
                         className="hover:-translate-y-3 hover:z-20 transition-transform"
-                        onSummon={handleSummon}
-                        onSetSpell={handleSetSpell}
-                        onActivate={handleActivate}
-                        onActivateField={handleActivateField}
-                        onSendToGraveyard={() => handleSendToGraveyard(card)}
+                        onSummon={(position) => handleSummon(card, position)}
+                        onSetSpellTrap={() => handleSetSpell(card)}
+                        onActivate={() => handleActivate(card)}
+                        onActivateField={() => handleActivateField(card)}
                       />
                       <span className="absolute -top-1 -right-1 text-[8px] bg-blue-700 text-white px-1 rounded">
                         {idx + 1}
