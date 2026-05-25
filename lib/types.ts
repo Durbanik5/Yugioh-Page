@@ -202,6 +202,30 @@ export interface CollectionCard {
   condition: CardCondition | null
   notes: string | null
   added_at: string
+  // New set/edition/price fields
+  set_name: string | null
+  set_code: string | null
+  edition: string | null
+  market_price: number | null
+  price_updated_at: string | null
+}
+
+// Card set info from YGOProDeck API
+export interface CardSetInfo {
+  set_name: string
+  set_code: string
+  set_rarity: string
+  set_rarity_code: string
+  set_price: string
+}
+
+// Card price info from YGOProDeck API
+export interface CardPriceInfo {
+  cardmarket_price: string
+  tcgplayer_price: string
+  ebay_price: string
+  amazon_price: string
+  coolstuffinc_price: string
 }
 
 export interface SavedMatch {
