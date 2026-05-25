@@ -197,6 +197,12 @@ export interface DuelGameCard {
   is_revealed: boolean
   has_attacked: boolean
   order_index: number
+  // Turn tracking fields for rule enforcement
+  turn_summoned?: number | null
+  turn_set?: number | null
+  has_changed_position?: boolean
+  attacks_declared?: number
+  controller_id?: string | null
   created_at: string
   updated_at: string
 }

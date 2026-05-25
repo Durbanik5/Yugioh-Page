@@ -239,7 +239,8 @@ export async function drawCards(
 export async function summonMonster(
   cardId: string,
   zoneIndex: number,
-  position: 'face_up_attack' | 'face_up_defense' | 'face_down_defense'
+  position: 'face_up_attack' | 'face_up_defense' | 'face_down_defense',
+  turnCount?: number
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
 
@@ -248,7 +249,9 @@ export async function summonMonster(
     .update({ 
       location: 'monster_zone', 
       zone_index: zoneIndex, 
-      position 
+      position,
+      turn_summoned: turnCount || null,
+      has_changed_position: false
     })
     .eq('id', cardId)
 
@@ -362,7 +365,10 @@ export async function changePosition(
 
   const { error } = await supabase
     .from('duel_game_cards')
-    .update({ position: newPosition })
+    .update({ 
+      position: newPosition,
+      has_changed_position: true
+    })
     .eq('id', cardId)
 
   if (error) {

@@ -6,6 +6,7 @@ import { CardInfoPanel } from './card-info-panel'
 import { ChainPrompt } from './chain-prompt'
 import { PhaseBar } from './phase-bar'
 import { TributeSelectionModal } from './tribute-selection-modal'
+import { EffectActivationModal } from './effect-activation-modal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -94,6 +95,7 @@ export function DuelField({
     activatingCard: DuelGameCard
     activatingPlayerId: string
   } | null>(null)
+  const [activatingCard, setActivatingCard] = useState<DuelGameCard | null>(null)
 
   // Organize cards by location and player
   const organizedCards = useMemo(() => {
@@ -188,8 +190,16 @@ export function DuelField({
       return
     }
     
-    await executeSpellTrapActivation(card)
-  }, [validateSpellTrapActivation, executeSpellTrapActivation])
+    // Show the effect activation modal
+    setActivatingCard(card)
+  }, [validateSpellTrapActivation])
+
+  const handleEffectResolve = useCallback(async () => {
+    if (!activatingCard) return
+    
+    await executeSpellTrapActivation(activatingCard)
+    setActivatingCard(null)
+  }, [activatingCard, executeSpellTrapActivation])
 
   const handleActivateField = useCallback(async (card: DuelGameCard) => {
     const result = await activateFieldSpell(card.id)
@@ -212,6 +222,18 @@ export function DuelField({
   }, [onCardsChanged])
 
   const handleChangePosition = useCallback(async (card: DuelGameCard, newPosition: CardPosition) => {
+    // Rule: Cannot change position of a monster that was summoned/set this turn
+    if (card.turn_summoned && card.turn_summoned === gameState?.turnCount) {
+      toast.error('Cannot change position of a monster summoned this turn')
+      return
+    }
+    
+    // Rule: Cannot change position of a monster that already changed position this turn
+    if (card.has_changed_position) {
+      toast.error('This monster already changed position this turn')
+      return
+    }
+    
     const result = await changePosition(card.id, newPosition)
     if (result.success) {
       toast.success('Changed position')
@@ -219,7 +241,7 @@ export function DuelField({
     } else {
       toast.error(result.error || 'Failed to change position')
     }
-  }, [onCardsChanged])
+  }, [onCardsChanged, gameState?.turnCount])
 
   const handleSendToGraveyard = useCallback(async (card: DuelGameCard) => {
     const result = await sendToGraveyard(card.id)
@@ -777,6 +799,14 @@ export function DuelField({
           onConfirm={confirmTributeSummon}
         />
       )}
+
+      {/* Effect Activation Modal */}
+      <EffectActivationModal
+        isOpen={!!activatingCard}
+        onClose={() => setActivatingCard(null)}
+        card={activatingCard}
+        onResolve={handleEffectResolve}
+      />
     </div>
   )
 }
