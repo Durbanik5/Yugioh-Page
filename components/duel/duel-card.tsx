@@ -11,8 +11,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { 
-  Sword, Shield, Flame, Send, RotateCcw, 
-  Eye, EyeOff, Plus, Minus, Ban, ChevronRight
+  Sword, Shield, Flame, 
+  Eye, EyeOff, Plus, Minus, ChevronRight
 } from 'lucide-react'
 import type { DuelGameCard, CardPosition } from '@/lib/types'
 
@@ -29,7 +29,6 @@ interface DuelCardProps {
   onChangePosition?: (position: CardPosition) => void
   onSendToGraveyard?: () => void
   onBanish?: (faceDown?: boolean) => void
-  onReturnToDeck?: (toTop?: boolean) => void
   onAddCounter?: () => void
   onRemoveCounter?: () => void
   disabled?: boolean
@@ -57,7 +56,6 @@ export function DuelCard({
   onChangePosition,
   onSendToGraveyard,
   onBanish,
-  onReturnToDeck,
   onAddCounter,
   onRemoveCounter,
   disabled = false,
@@ -69,8 +67,6 @@ export function DuelCard({
   const [isOpen, setIsOpen] = useState(false)
   const [showSummonOptions, setShowSummonOptions] = useState(false)
   const [showPositionOptions, setShowPositionOptions] = useState(false)
-  const [showBanishOptions, setShowBanishOptions] = useState(false)
-  const [showDeckOptions, setShowDeckOptions] = useState(false)
 
   const showCardBack = isHidden || 
     (!isOwner && card.location === 'hand') ||
@@ -96,8 +92,6 @@ export function DuelCard({
     setIsOpen(false)
     setShowSummonOptions(false)
     setShowPositionOptions(false)
-    setShowBanishOptions(false)
-    setShowDeckOptions(false)
   }
 
   const cardContent = (
@@ -160,8 +154,6 @@ export function DuelCard({
       if (!open) {
         setShowSummonOptions(false)
         setShowPositionOptions(false)
-        setShowBanishOptions(false)
-        setShowDeckOptions(false)
       }
     }}>
       <PopoverTrigger asChild disabled={disabled}>
@@ -224,7 +216,7 @@ export function DuelCard({
                 Set Monster
               </Button>
             )}
-            {/* Spell/Trap actions */}
+            {/* Spell/Trap - can only Set from hand (Normal Spells are played, not "activated") */}
             {isSpellTrap && onSetSpellTrap && (
               <Button
                 variant="ghost"
@@ -236,6 +228,7 @@ export function DuelCard({
                 Set
               </Button>
             )}
+            {/* Only Normal/Quick-Play Spells can be played from hand */}
             {card.card_type === 'spell' && onActivate && (
               <Button
                 variant="ghost"
@@ -244,7 +237,7 @@ export function DuelCard({
                 onClick={() => handleAction(onActivate)}
               >
                 <Flame className="mr-2 h-3.5 w-3.5" />
-                Activate
+                Play Spell
               </Button>
             )}
           </div>
@@ -320,94 +313,38 @@ export function DuelCard({
           </Button>
         )}
 
-        {/* Field actions - only for cards on the field */}
-        {card.location !== 'hand' && (
+        {/* Graveyard actions - banish for card effects */}
+        {card.location === 'graveyard' && onBanish && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start h-8 text-xs"
+            onClick={() => handleAction(() => onBanish(false))}
+          >
+            <Eye className="mr-2 h-3.5 w-3.5" />
+            Banish (Card Effect)
+          </Button>
+        )}
+
+        {/* Field spell zone - can replace and send to GY */}
+        {card.location === 'field_zone' && onSendToGraveyard && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start h-8 text-xs"
+            onClick={() => handleAction(onSendToGraveyard)}
+          >
+            <EyeOff className="mr-2 h-3.5 w-3.5" />
+            Send to GY (Replace)
+          </Button>
+        )}
+
+        {/* Note for field monster/spell zone cards */}
+        {card.location !== 'hand' && (card.location === 'monster_zone' || card.location === 'spell_zone') && (
           <>
             <Separator className="my-1" />
-            <div className="space-y-0.5">
-              {onSendToGraveyard && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start h-8 text-xs"
-                  onClick={() => handleAction(onSendToGraveyard)}
-                >
-                  <Send className="mr-2 h-3.5 w-3.5" />
-                  Send to Graveyard
-                </Button>
-              )}
-              
-              {onBanish && !showBanishOptions && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-between h-8 text-xs"
-                  onClick={() => setShowBanishOptions(true)}
-                >
-                  <span className="flex items-center">
-                    <Ban className="mr-2 h-3.5 w-3.5" />
-                    Banish
-                  </span>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {onBanish && showBanishOptions && (
-                <div className="pl-2 space-y-0.5 border-l-2 border-primary/50 ml-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start h-8 text-xs"
-                    onClick={() => handleAction(() => onBanish(false))}
-                  >
-                    <Eye className="mr-2 h-3.5 w-3.5" />
-                    Face-up
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start h-8 text-xs"
-                    onClick={() => handleAction(() => onBanish(true))}
-                  >
-                    <EyeOff className="mr-2 h-3.5 w-3.5" />
-                    Face-down
-                  </Button>
-                </div>
-              )}
-
-              {onReturnToDeck && !showDeckOptions && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-between h-8 text-xs"
-                  onClick={() => setShowDeckOptions(true)}
-                >
-                  <span className="flex items-center">
-                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                    Return to Deck
-                  </span>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {onReturnToDeck && showDeckOptions && (
-                <div className="pl-2 space-y-0.5 border-l-2 border-primary/50 ml-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start h-8 text-xs"
-                    onClick={() => handleAction(() => onReturnToDeck(true))}
-                  >
-                    Top of Deck
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start h-8 text-xs"
-                    onClick={() => handleAction(() => onReturnToDeck(false))}
-                  >
-                    Shuffle into Deck
-                  </Button>
-                </div>
-              )}
+            <div className="px-2 py-1 text-[10px] text-muted-foreground italic">
+              Cards go to GY through battle or card effects
             </div>
           </>
         )}

@@ -267,8 +267,6 @@ export function DuelField({
           onActivateField={() => handleActivateField(card)}
           onFlip={() => handleFlip(card)}
           onChangePosition={(pos) => handleChangePosition(card, pos)}
-          onSendToGraveyard={() => handleSendToGraveyard(card)}
-          onBanish={() => handleBanish(card)}
         />
       )
     }
