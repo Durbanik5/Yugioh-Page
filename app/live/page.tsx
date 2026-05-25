@@ -12,10 +12,11 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { 
   Radio, Plus, Users, Eye, Swords, Clock, 
-  ArrowRight, Zap, UserPlus
+  ArrowRight, Zap, UserPlus, Settings2, Heart, Timer
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Player, DuelRoom, MatchType, DuelFormat } from '@/lib/types'
@@ -35,6 +36,14 @@ export default function LiveDuelsPage() {
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [streamUrl, setStreamUrl] = useState('')
   const [creating, setCreating] = useState(false)
+  
+  // YGOPro-style duel settings
+  const [startingLp, setStartingLp] = useState(8000)
+  const [startingHandSize, setStartingHandSize] = useState(5)
+  const [masterRule, setMasterRule] = useState('MR5')
+  const [firstTurnDraw, setFirstTurnDraw] = useState(false)
+  const [shuffleDeck, setShuffleDeck] = useState(true)
+  const [timePerTurn, setTimePerTurn] = useState<number | null>(null)
 
   const supabase = createClient()
 
@@ -120,6 +129,12 @@ export default function LiveDuelsPage() {
         format: format,
         stream_url: streamUrl.trim() || null,
         created_by: selectedPlayer,
+        starting_lp: startingLp,
+        starting_hand_size: startingHandSize,
+        master_rule: masterRule,
+        first_turn_draw: firstTurnDraw,
+        shuffle_deck: shuffleDeck,
+        time_per_turn: timePerTurn,
       })
       .select()
       .single()
@@ -130,11 +145,13 @@ export default function LiveDuelsPage() {
       return
     }
 
-    // Add creator as participant
+    // Add creator as participant with room's starting LP
     await supabase.from('duel_room_participants').insert({
       room_id: room.id,
       player_id: selectedPlayer,
       is_spectator: false,
+      life_points: startingLp,
+      hand_count: startingHandSize,
     })
 
     toast.success(`Room created! Code: ${roomCode}`)
@@ -292,6 +309,124 @@ export default function LiveDuelsPage() {
                     </p>
                   </div>
 
+                  {/* YGOPro-style Duel Settings */}
+                  <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/30">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Settings2 className="h-4 w-4 text-primary" />
+                      Duel Settings
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Starting LP</Label>
+                        <Select value={startingLp.toString()} onValueChange={(v) => setStartingLp(parseInt(v))}>
+                          <SelectTrigger className="bg-input border-border mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="8000">
+                              <div className="flex items-center gap-2">
+                                <Heart className="h-3 w-3 text-red-500" />
+                                8000 LP
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="4000">
+                              <div className="flex items-center gap-2">
+                                <Heart className="h-3 w-3 text-orange-500" />
+                                4000 LP
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="2000">
+                              <div className="flex items-center gap-2">
+                                <Heart className="h-3 w-3 text-yellow-500" />
+                                2000 LP
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="1000">
+                              <div className="flex items-center gap-2">
+                                <Heart className="h-3 w-3 text-purple-500" />
+                                1000 LP
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Starting Hand</Label>
+                        <Select value={startingHandSize.toString()} onValueChange={(v) => setStartingHandSize(parseInt(v))}>
+                          <SelectTrigger className="bg-input border-border mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5 Cards</SelectItem>
+                            <SelectItem value="6">6 Cards</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Master Rule</Label>
+                        <Select value={masterRule} onValueChange={setMasterRule}>
+                          <SelectTrigger className="bg-input border-border mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="MR5">MR5 (2020)</SelectItem>
+                            <SelectItem value="MR4">MR4 (Link)</SelectItem>
+                            <SelectItem value="MR3">MR3 (Pendulum)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-muted-foreground text-xs">Time per Turn</Label>
+                        <Select value={timePerTurn?.toString() || 'none'} onValueChange={(v) => setTimePerTurn(v === 'none' ? null : parseInt(v))}>
+                          <SelectTrigger className="bg-input border-border mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <div className="flex items-center gap-2">
+                                <Timer className="h-3 w-3 text-muted-foreground" />
+                                No Limit
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="180">3 Minutes</SelectItem>
+                            <SelectItem value="300">5 Minutes</SelectItem>
+                            <SelectItem value="480">8 Minutes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-2 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm text-foreground">Draw on First Turn</Label>
+                          <p className="text-xs text-muted-foreground">First player draws during their Draw Phase</p>
+                        </div>
+                        <Switch
+                          checked={firstTurnDraw}
+                          onCheckedChange={setFirstTurnDraw}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm text-foreground">Shuffle Deck</Label>
+                          <p className="text-xs text-muted-foreground">Automatically shuffle before duel starts</p>
+                        </div>
+                        <Switch
+                          checked={shuffleDeck}
+                          onCheckedChange={setShuffleDeck}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <Button
                     onClick={handleCreateRoom}
                     disabled={creating}
@@ -412,6 +547,31 @@ function RoomCard({ room }: { room: DuelRoom & { participants: any[]; creator: P
             <Eye className="h-4 w-4" />
             {spectators.length} watching
           </span>
+        </div>
+        
+        {/* YGOPro-style Duel Settings Display */}
+        <div className="flex flex-wrap gap-1.5 mb-4 text-xs">
+          <span className="bg-muted/50 px-2 py-0.5 rounded text-muted-foreground flex items-center gap-1">
+            <Heart className="h-3 w-3 text-red-500" />
+            {room.starting_lp || 8000} LP
+          </span>
+          <span className="bg-muted/50 px-2 py-0.5 rounded text-muted-foreground">
+            {room.starting_hand_size || 5} cards
+          </span>
+          <span className="bg-muted/50 px-2 py-0.5 rounded text-muted-foreground">
+            {room.master_rule || 'MR5'}
+          </span>
+          {room.first_turn_draw && (
+            <span className="bg-primary/20 px-2 py-0.5 rounded text-primary text-[10px]">
+              1st Draw
+            </span>
+          )}
+          {room.time_per_turn && (
+            <span className="bg-muted/50 px-2 py-0.5 rounded text-muted-foreground flex items-center gap-1">
+              <Timer className="h-3 w-3" />
+              {room.time_per_turn / 60}m
+            </span>
+          )}
         </div>
 
         {room.status === 'active' && duelists.length >= 2 && (

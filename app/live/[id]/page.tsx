@@ -49,19 +49,21 @@ function DSoDLifePointDisplay({
   isCurrentTurn,
   position,
   totalDuelists,
-  matchType
+  matchType,
+  maxLp = 8000
 }: { 
   participant: DuelRoomParticipant & { player: Player; deck: Deck | null }
   isCurrentTurn: boolean
   position?: { angle: number; radius: number }
   totalDuelists: number
   matchType?: string
+  maxLp?: number
 }) {
-  const lpPercentage = (participant.life_points / 8000) * 100
+  const lpPercentage = (participant.life_points / maxLp) * 100
   const segments = 8
-  const filledSegments = Math.ceil((participant.life_points / 8000) * segments)
-  const isLowLp = participant.life_points <= 2000
-  const isCriticalLp = participant.life_points <= 1000
+  const filledSegments = Math.ceil((participant.life_points / maxLp) * segments)
+  const isLowLp = participant.life_points <= maxLp * 0.25
+  const isCriticalLp = participant.life_points <= maxLp * 0.125
 
   // Parse field zone data - new format with card details
   const monsterZones: MonsterZone[] = (() => {
@@ -506,6 +508,7 @@ function SpectatorScreen({
                   position={{ angle, radius }}
                   totalDuelists={duelists.length}
                   matchType={room.match_type}
+                  maxLp={room.starting_lp || 8000}
                 />
               )
             })}
@@ -528,6 +531,7 @@ function SpectatorScreen({
               isCurrentTurn={room.current_turn_player_id === participant.player_id}
               totalDuelists={duelists.length}
               matchType={room.match_type}
+              maxLp={room.starting_lp || 8000}
             />
           ))}
         </div>
@@ -758,6 +762,8 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
       player_id: selectedPlayer,
       deck_id: selectedDeck || null,
       is_spectator: !actualJoinAsDuelist,
+      life_points: actualJoinAsDuelist ? (room?.starting_lp || 8000) : 8000,
+      hand_count: actualJoinAsDuelist ? (room?.starting_hand_size || 5) : 0,
     })
 
     if (error) {

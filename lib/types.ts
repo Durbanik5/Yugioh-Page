@@ -146,6 +146,13 @@ export interface DuelRoom {
   turn_count: number
   current_turn_player_id: string | null
   turn_phase: TurnPhase
+  // YGOPro-style duel settings
+  starting_lp: number
+  starting_hand_size: number
+  master_rule: string
+  first_turn_draw: boolean
+  shuffle_deck: boolean
+  time_per_turn: number | null
   created_at: string
   started_at: string | null
   ended_at: string | null
