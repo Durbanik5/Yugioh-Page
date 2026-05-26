@@ -432,6 +432,253 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     return { success: true }
   }, [validateSpellTrapActivation, allCards, myPlayerId, supabase, onCardsChanged])
 
+  // ========== EFFECT EXECUTION FUNCTIONS ==========
+  
+  // Draw cards from deck
+  const drawCardsEffect = useCallback(async (count: number): Promise<{ success: boolean; drawnCards?: string[] }> => {
+    const deck = allCards
+      .filter(c => c.player_id === myPlayerId && c.location === 'deck')
+      .sort((a, b) => a.order_index - b.order_index)
+
+    if (deck.length < count) {
+      // Deck out - you lose if you can't draw
+      toast.error(`Cannot draw ${count} cards - only ${deck.length} cards left in deck!`)
+      return { success: false }
+    }
+
+    const cardsToDraw = deck.slice(0, count)
+    const drawnNames: string[] = []
+
+    for (const card of cardsToDraw) {
+      await supabase
+        .from('duel_game_cards')
+        .update({ location: 'hand', zone_index: null })
+        .eq('id', card.id)
+      drawnNames.push(card.card_name)
+    }
+
+    toast.success(`Drew ${count} card(s): ${drawnNames.join(', ')}`)
+    onCardsChanged()
+    return { success: true, drawnCards: drawnNames }
+  }, [allCards, myPlayerId, supabase, onCardsChanged])
+
+  // Destroy cards (send to graveyard)
+  const destroyCardsEffect = useCallback(async (cardIds: string[]): Promise<{ success: boolean }> => {
+    if (cardIds.length === 0) return { success: true }
+
+    const cardsToDestroy = allCards.filter(c => cardIds.includes(c.id))
+    const names = cardsToDestroy.map(c => c.card_name)
+
+    await supabase
+      .from('duel_game_cards')
+      .update({ 
+        location: 'graveyard', 
+        zone_index: null,
+        position: 'face_up_attack' 
+      })
+      .in('id', cardIds)
+
+    toast.success(`Destroyed: ${names.join(', ')}`)
+    onCardsChanged()
+    return { success: true }
+  }, [allCards, supabase, onCardsChanged])
+
+  // Banish cards
+  const banishCardsEffect = useCallback(async (cardIds: string[], faceDown: boolean = false): Promise<{ success: boolean }> => {
+    if (cardIds.length === 0) return { success: true }
+
+    const cardsToBanish = allCards.filter(c => cardIds.includes(c.id))
+    const names = cardsToBanish.map(c => c.card_name)
+
+    await supabase
+      .from('duel_game_cards')
+      .update({ 
+        location: 'banished', 
+        zone_index: null,
+        position: faceDown ? 'face_down' : 'face_up_attack' 
+      })
+      .in('id', cardIds)
+
+    toast.success(`Banished${faceDown ? ' face-down' : ''}: ${names.join(', ')}`)
+    onCardsChanged()
+    return { success: true }
+  }, [allCards, supabase, onCardsChanged])
+
+  // Add card from deck to hand (search)
+  const searchDeckEffect = useCallback(async (cardId: string): Promise<{ success: boolean }> => {
+    const card = allCards.find(c => c.id === cardId)
+    if (!card || card.location !== 'deck') {
+      toast.error('Card not found in deck')
+      return { success: false }
+    }
+
+    await supabase
+      .from('duel_game_cards')
+      .update({ location: 'hand', zone_index: null })
+      .eq('id', cardId)
+
+    toast.success(`Added ${card.card_name} to hand!`)
+    onCardsChanged()
+    return { success: true }
+  }, [allCards, supabase, onCardsChanged])
+
+  // Special summon from hand/deck/graveyard
+  const specialSummonEffect = useCallback(async (
+    cardId: string, 
+    position: 'face_up_attack' | 'face_up_defense' | 'face_down_defense' = 'face_up_attack'
+  ): Promise<{ success: boolean }> => {
+    const card = allCards.find(c => c.id === cardId)
+    if (!card) {
+      toast.error('Card not found')
+      return { success: false }
+    }
+
+    // Find empty monster zone
+    const occupiedZones = allCards
+      .filter(c => c.player_id === myPlayerId && c.location === 'monster_zone')
+      .map(c => c.zone_index)
+    
+    let targetZone = -1
+    for (let i = 0; i < 5; i++) {
+      if (!occupiedZones.includes(i)) {
+        targetZone = i
+        break
+      }
+    }
+
+    if (targetZone === -1) {
+      toast.error('No empty Monster zones')
+      return { success: false }
+    }
+
+    await supabase
+      .from('duel_game_cards')
+      .update({ 
+        location: 'monster_zone',
+        zone_index: targetZone,
+        position,
+        turn_summoned: gameState?.turnCount,
+        has_changed_position: false,
+      })
+      .eq('id', cardId)
+
+    toast.success(`Special Summoned ${card.card_name}!`)
+    onCardsChanged()
+    return { success: true }
+  }, [allCards, myPlayerId, supabase, gameState?.turnCount, onCardsChanged])
+
+  // Return card to hand
+  const returnToHandEffect = useCallback(async (cardId: string): Promise<{ success: boolean }> => {
+    const card = allCards.find(c => c.id === cardId)
+    if (!card) {
+      toast.error('Card not found')
+      return { success: false }
+    }
+
+    await supabase
+      .from('duel_game_cards')
+      .update({ location: 'hand', zone_index: null })
+      .eq('id', cardId)
+
+    toast.success(`Returned ${card.card_name} to hand!`)
+    onCardsChanged()
+    return { success: true }
+  }, [allCards, supabase, onCardsChanged])
+
+  // Send card to graveyard (without "destroying")
+  const sendToGraveyardEffect = useCallback(async (cardIds: string[]): Promise<{ success: boolean }> => {
+    if (cardIds.length === 0) return { success: true }
+
+    const cards = allCards.filter(c => cardIds.includes(c.id))
+    const names = cards.map(c => c.card_name)
+
+    await supabase
+      .from('duel_game_cards')
+      .update({ 
+        location: 'graveyard', 
+        zone_index: null,
+        position: 'face_up_attack' 
+      })
+      .in('id', cardIds)
+
+    toast.success(`Sent to GY: ${names.join(', ')}`)
+    onCardsChanged()
+    return { success: true }
+  }, [allCards, supabase, onCardsChanged])
+
+  // Inflict damage to player
+  const inflictDamageEffect = useCallback(async (
+    targetPlayerId: string, 
+    amount: number
+  ): Promise<{ success: boolean }> => {
+    const participants = room.duel_room_participants || []
+    const target = participants.find(p => p.player_id === targetPlayerId)
+    
+    if (!target) {
+      toast.error('Target player not found')
+      return { success: false }
+    }
+
+    const newLP = Math.max(0, (target.life_points || 8000) - amount)
+    await supabase
+      .from('duel_room_participants')
+      .update({ life_points: newLP })
+      .eq('id', target.id)
+
+    toast.success(`Inflicted ${amount} damage!`)
+
+    if (newLP <= 0) {
+      const winner = participants.find(p => p.player_id !== targetPlayerId)
+      toast.success(`${winner?.player?.nickname || 'Player'} wins!`)
+      await supabase
+        .from('duel_rooms')
+        .update({ status: 'completed', winner_id: winner?.player_id })
+        .eq('id', room.id)
+    }
+
+    onCardsChanged()
+    return { success: true }
+  }, [room, supabase, onCardsChanged])
+
+  // Gain life points
+  const gainLifePointsEffect = useCallback(async (amount: number): Promise<{ success: boolean }> => {
+    const participants = room.duel_room_participants || []
+    const me = participants.find(p => p.player_id === myPlayerId)
+    
+    if (!me) {
+      toast.error('Player not found')
+      return { success: false }
+    }
+
+    const newLP = (me.life_points || 8000) + amount
+    await supabase
+      .from('duel_room_participants')
+      .update({ life_points: newLP })
+      .eq('id', me.id)
+
+    toast.success(`Gained ${amount} LP! (Now: ${newLP})`)
+    onCardsChanged()
+    return { success: true }
+  }, [room, myPlayerId, supabase, onCardsChanged])
+
+  // Get deck cards for searching
+  const getSearchableDeck = useCallback(() => {
+    return allCards.filter(c => c.player_id === myPlayerId && c.location === 'deck')
+  }, [allCards, myPlayerId])
+
+  // Get graveyard cards
+  const getGraveyard = useCallback((playerId?: string) => {
+    const targetPlayer = playerId || myPlayerId
+    return allCards.filter(c => c.player_id === targetPlayer && c.location === 'graveyard')
+  }, [allCards, myPlayerId])
+
+  // Get opponent's player ID
+  const getOpponentId = useCallback(() => {
+    const participants = room.duel_room_participants || []
+    const opponent = participants.find(p => p.player_id !== myPlayerId)
+    return opponent?.player_id
+  }, [room.duel_room_participants, myPlayerId])
+
   // Set spell/trap face-down
   const setSpellTrap = useCallback(async (card: DuelGameCard) => {
     if (!isMyTurn) {
@@ -996,5 +1243,21 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     // Position actions
     flipSummon,
     changeMonsterPosition,
+    
+    // Effect execution functions
+    drawCardsEffect,
+    destroyCardsEffect,
+    banishCardsEffect,
+    searchDeckEffect,
+    specialSummonEffect,
+    returnToHandEffect,
+    sendToGraveyardEffect,
+    inflictDamageEffect,
+    gainLifePointsEffect,
+    
+    // Utility getters
+    getSearchableDeck,
+    getGraveyard,
+    getOpponentId,
   }
 }

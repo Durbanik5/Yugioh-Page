@@ -4,10 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import type { DuelGameCard, CardLocation, CardPosition, DuelCardType } from '@/lib/types'
 
 // Cache for card lookups to avoid repeated API calls
-const cardCache = new Map<string, { id: number; type: string; atk?: number; def?: number; level?: number; attribute?: string }>()
+const cardCache = new Map<string, { id: number; type: string; desc?: string; atk?: number; def?: number; level?: number; attribute?: string }>()
 
 // Lookup card details from YGOProDeck API
-async function lookupCardDetails(cardName: string): Promise<{ id: number; type: string; atk?: number; def?: number; level?: number; attribute?: string } | null> {
+async function lookupCardDetails(cardName: string): Promise<{ id: number; type: string; desc?: string; atk?: number; def?: number; level?: number; attribute?: string } | null> {
   // Check cache first
   if (cardCache.has(cardName)) {
     return cardCache.get(cardName)!
@@ -30,6 +30,7 @@ async function lookupCardDetails(cardName: string): Promise<{ id: number; type: 
       const result = {
         id: card.id,
         type: card.type,
+        desc: card.desc,  // Card effect text / description
         atk: card.atk,
         def: card.def,
         level: card.level || card.linkval,

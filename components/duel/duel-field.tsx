@@ -84,6 +84,18 @@ export function DuelField({
     enterMain2,
     flipSummon: engineFlipSummon,
     changeMonsterPosition,
+    // Effect execution functions
+    drawCardsEffect,
+    destroyCardsEffect,
+    banishCardsEffect,
+    searchDeckEffect,
+    specialSummonEffect,
+    sendToGraveyardEffect,
+    inflictDamageEffect,
+    gainLifePointsEffect,
+    getSearchableDeck,
+    getGraveyard,
+    getOpponentId,
   } = useDuelEngine({ room, myPlayerId, allCards, onCardsChanged })
 
   const [selectedCard, setSelectedCard] = useState<DuelGameCard | null>(null)
@@ -913,6 +925,20 @@ export function DuelField({
         onClose={() => setActivatingCard(null)}
         card={activatingCard}
         onResolve={handleEffectResolve}
+        availableTargets={opponentFieldMonsters}
+        searchableDeck={getSearchableDeck()}
+        graveyard={getGraveyard()}
+        opponentId={getOpponentId()}
+        effectExecutors={{
+          drawCardsEffect,
+          destroyCardsEffect,
+          banishCardsEffect,
+          searchDeckEffect,
+          specialSummonEffect,
+          sendToGraveyardEffect,
+          inflictDamageEffect,
+          gainLifePointsEffect,
+        }}
       />
     </div>
   )

@@ -13,12 +13,24 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Checkbox } from '@/components/ui/checkbox'
 import { 
   Sword, Shield, Star, Sparkles, AlertCircle, 
-  Search, Target, Trash2, RotateCcw, Plus, Zap, Heart, Wand2
+  Search, Target, Trash2, RotateCcw, Plus, Zap, Heart, Wand2, Check
 } from 'lucide-react'
 import type { DuelGameCard } from '@/lib/types'
 import { getCardScript, parseEffectText } from '@/lib/duel-engine/card-scripts'
+
+interface EffectExecutors {
+  drawCardsEffect: (count: number) => Promise<{ success: boolean }>
+  destroyCardsEffect: (cardIds: string[]) => Promise<{ success: boolean }>
+  banishCardsEffect: (cardIds: string[], faceDown?: boolean) => Promise<{ success: boolean }>
+  searchDeckEffect: (cardId: string) => Promise<{ success: boolean }>
+  specialSummonEffect: (cardId: string, position?: 'face_up_attack' | 'face_up_defense') => Promise<{ success: boolean }>
+  sendToGraveyardEffect: (cardIds: string[]) => Promise<{ success: boolean }>
+  inflictDamageEffect: (targetPlayerId: string, amount: number) => Promise<{ success: boolean }>
+  gainLifePointsEffect: (amount: number) => Promise<{ success: boolean }>
+}
 
 interface EffectActivationModalProps {
   isOpen: boolean
@@ -26,6 +38,10 @@ interface EffectActivationModalProps {
   card: DuelGameCard | null
   onResolve: (action: EffectAction) => void
   availableTargets?: DuelGameCard[]
+  searchableDeck?: DuelGameCard[]
+  graveyard?: DuelGameCard[]
+  opponentId?: string
+  effectExecutors?: EffectExecutors
 }
 
 export type EffectAction = 
@@ -48,8 +64,15 @@ export function EffectActivationModal({
   card,
   onResolve,
   availableTargets = [],
+  searchableDeck = [],
+  graveyard = [],
+  opponentId,
+  effectExecutors,
 }: EffectActivationModalProps) {
   const [selectedTargets, setSelectedTargets] = useState<string[]>([])
+  const [showDeckSearch, setShowDeckSearch] = useState(false)
+  const [showGraveyardSelect, setShowGraveyardSelect] = useState(false)
+  const [selectedDeckCard, setSelectedDeckCard] = useState<string | null>(null)
 
   // Parse effect text for action keywords - must be called before any early return
   const { possibleActions, keywords: effectKeywords } = useMemo(() => {
@@ -73,28 +96,109 @@ export function EffectActivationModal({
   const hasScript = !!cardScript && cardScript.effects.length > 0
   const scriptedEffects = cardScript?.effects || []
 
-  const handleResolve = (actionType: string) => {
-    switch (actionType) {
-      case 'search':
-        onResolve({ type: 'search_deck' })
-        break
-      case 'draw':
-        onResolve({ type: 'draw', count: 1 })
-        break
-      case 'destroy':
-        onResolve({ type: 'destroy', targetIds: selectedTargets })
-        break
-      case 'banish':
-        onResolve({ type: 'banish', targetIds: selectedTargets })
-        break
-      case 'negate':
-        onResolve({ type: 'negate' })
-        break
-      default:
-        onResolve({ type: 'manual' })
+  const handleResolve = async (actionType: string) => {
+    // If we have effect executors, use them for actual effect resolution
+    if (effectExecutors) {
+      switch (actionType) {
+        case 'draw':
+          // Parse draw count from effect text
+          const drawMatch = card?.effect_text?.match(/draw (\d+|a|one|two|three) cards?/i)
+          let drawCount = 1
+          if (drawMatch) {
+            const num = drawMatch[1].toLowerCase()
+            if (num === 'a' || num === 'one') drawCount = 1
+            else if (num === 'two') drawCount = 2
+            else if (num === 'three') drawCount = 3
+            else drawCount = parseInt(num) || 1
+          }
+          // Special case for Pot of Greed
+          if (card?.card_name === 'Pot of Greed') drawCount = 2
+          await effectExecutors.drawCardsEffect(drawCount)
+          break
+        case 'destroy':
+          if (selectedTargets.length > 0) {
+            await effectExecutors.destroyCardsEffect(selectedTargets)
+          } else {
+            // Show target selection for destroy effects
+            onResolve({ type: 'destroy', targetIds: [] })
+            return
+          }
+          break
+        case 'banish':
+          if (selectedTargets.length > 0) {
+            await effectExecutors.banishCardsEffect(selectedTargets)
+          }
+          break
+        case 'search':
+          if (selectedDeckCard) {
+            await effectExecutors.searchDeckEffect(selectedDeckCard)
+          } else {
+            setShowDeckSearch(true)
+            return
+          }
+          break
+        case 'special_summon':
+          if (selectedDeckCard) {
+            await effectExecutors.specialSummonEffect(selectedDeckCard)
+          } else if (showGraveyardSelect && selectedTargets.length > 0) {
+            await effectExecutors.specialSummonEffect(selectedTargets[0])
+          } else {
+            setShowGraveyardSelect(true)
+            return
+          }
+          break
+        case 'gain_lp':
+          const lpMatch = card?.effect_text?.match(/gain (\d+) life points?/i)
+          const lpAmount = lpMatch ? parseInt(lpMatch[1]) : 1000
+          await effectExecutors.gainLifePointsEffect(lpAmount)
+          break
+        case 'damage':
+          if (opponentId) {
+            const dmgMatch = card?.effect_text?.match(/inflict (\d+) damage/i)
+            const dmgAmount = dmgMatch ? parseInt(dmgMatch[1]) : 500
+            await effectExecutors.inflictDamageEffect(opponentId, dmgAmount)
+          }
+          break
+        default:
+          onResolve({ type: 'manual' })
+      }
+    } else {
+      // Fallback to passing action to parent
+      switch (actionType) {
+        case 'search':
+          onResolve({ type: 'search_deck' })
+          break
+        case 'draw':
+          onResolve({ type: 'draw', count: 1 })
+          break
+        case 'destroy':
+          onResolve({ type: 'destroy', targetIds: selectedTargets })
+          break
+        case 'banish':
+          onResolve({ type: 'banish', targetIds: selectedTargets })
+          break
+        case 'negate':
+          onResolve({ type: 'negate' })
+          break
+        default:
+          onResolve({ type: 'manual' })
+      }
     }
+    
     setSelectedTargets([])
+    setSelectedDeckCard(null)
+    setShowDeckSearch(false)
+    setShowGraveyardSelect(false)
     onClose()
+  }
+
+  const handleSearchSelect = async (cardId: string) => {
+    setSelectedDeckCard(cardId)
+    if (effectExecutors) {
+      await effectExecutors.searchDeckEffect(cardId)
+      setShowDeckSearch(false)
+      onClose()
+    }
   }
 
   return (
@@ -296,6 +400,90 @@ export function EffectActivationModal({
                 Resolve Manually (Effect Applied)
               </Button>
             </div>
+            
+            {/* Deck Search Selection */}
+            {showDeckSearch && searchableDeck.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg border border-cyan-800/50 bg-cyan-950/20">
+                <p className="text-sm font-medium text-cyan-400 mb-2">Select a card from your Deck:</p>
+                <ScrollArea className="h-48">
+                  <div className="space-y-1">
+                    {searchableDeck.map(deckCard => (
+                      <button
+                        key={deckCard.id}
+                        onClick={() => handleSearchSelect(deckCard.id)}
+                        className="w-full flex items-center gap-2 p-2 rounded hover:bg-slate-800 transition-colors text-left"
+                      >
+                        <div className="w-8 h-11 relative rounded overflow-hidden flex-shrink-0">
+                          <Image
+                            src={deckCard.card_id 
+                              ? `https://images.ygoprodeck.com/images/cards_small/${deckCard.card_id}.jpg`
+                              : '/images/card-back.jpg'
+                            }
+                            alt={deckCard.card_name}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{deckCard.card_name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {deckCard.card_type.replace('_', ' ')}
+                            {deckCard.level ? ` - Level ${deckCard.level}` : ''}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+            
+            {/* Graveyard Selection for Special Summon */}
+            {showGraveyardSelect && graveyard.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg border border-purple-800/50 bg-purple-950/20">
+                <p className="text-sm font-medium text-purple-400 mb-2">Select a monster from your Graveyard:</p>
+                <ScrollArea className="h-48">
+                  <div className="space-y-1">
+                    {graveyard
+                      .filter(c => c.card_type.toLowerCase().includes('monster'))
+                      .map(gyCard => (
+                        <button
+                          key={gyCard.id}
+                          onClick={async () => {
+                            if (effectExecutors) {
+                              await effectExecutors.specialSummonEffect(gyCard.id)
+                              setShowGraveyardSelect(false)
+                              onClose()
+                            }
+                          }}
+                          className="w-full flex items-center gap-2 p-2 rounded hover:bg-slate-800 transition-colors text-left"
+                        >
+                          <div className="w-8 h-11 relative rounded overflow-hidden flex-shrink-0">
+                            <Image
+                              src={gyCard.card_id 
+                                ? `https://images.ygoprodeck.com/images/cards_small/${gyCard.card_id}.jpg`
+                                : '/images/card-back.jpg'
+                              }
+                              alt={gyCard.card_name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{gyCard.card_name}</p>
+                            <div className="flex gap-2 text-xs">
+                              <span className="text-red-400">ATK {gyCard.attack}</span>
+                              <span className="text-blue-400">DEF {gyCard.defense}</span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </div>
         </div>
 
