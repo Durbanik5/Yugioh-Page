@@ -24,6 +24,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase, DuelGameCard } from '@/lib/types'
 import { DuelField } from '@/components/duel/duel-field'
+import { MasterDuelField } from '@/components/duel/master-duel-field'
 import { initializeDuelDeck, drawCards, getDuelCards } from '@/lib/duel-actions'
 
 // Field Zone Card Types
@@ -608,7 +609,7 @@ function SpectatorScreen({
           
           return (
             <div className="absolute inset-4 top-20 bottom-20 flex items-center justify-center z-10">
-              <DuelField
+              <MasterDuelField
                 room={room}
                 myPlayerId={viewerPlayerId}
                 opponentPlayerId={opponentDuelist?.player_id || null}
