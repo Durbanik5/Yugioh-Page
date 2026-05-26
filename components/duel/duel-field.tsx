@@ -427,6 +427,7 @@ export function DuelField({
           onFlip={() => handleFlip(card)}
           onChangePosition={(pos) => handleChangePosition(card, pos)}
           onAttack={canAttack ? () => handleAttack(card) : undefined}
+          onHover={setHoveredCard}
         />
       )
     }
@@ -762,6 +763,7 @@ export function DuelField({
                         onSetSpellTrap={() => handleSetSpell(card)}
                         onActivate={() => handleActivate(card)}
                         onActivateField={() => handleActivateField(card)}
+                        onHover={setHoveredCard}
                       />
                       <span className="absolute -top-1 -right-1 text-[8px] bg-blue-700 text-white px-1 rounded">
                         {idx + 1}
@@ -814,6 +816,7 @@ export function DuelField({
                   size="md"
                   showActions={graveyardOpen === 'mine'}
                   onBanish={graveyardOpen === 'mine' ? () => handleBanish(card) : undefined}
+                  onHover={setHoveredCard}
                 />
               ))}
               {(graveyardOpen === 'mine' ? organizedCards.my.graveyard : organizedCards.opponent.graveyard).length === 0 && (
@@ -844,6 +847,7 @@ export function DuelField({
                   isOwner={banishedOpen === 'mine'}
                   size="md"
                   showActions={banishedOpen === 'mine'}
+                  onHover={setHoveredCard}
                 />
               ))}
               {(banishedOpen === 'mine' ? organizedCards.my.banished : organizedCards.opponent.banished).length === 0 && (

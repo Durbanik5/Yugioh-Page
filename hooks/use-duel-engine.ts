@@ -296,6 +296,27 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
 
     const summonType = position === 'face_down_defense' ? 'Set' : 'Normal Summoned'
     toast.success(`${summonType} ${card.card_name}!`)
+    
+    // Check for trigger effects on summon (only for face-up summons)
+    if (position !== 'face_down_defense' && card.effect_text) {
+      const effectText = card.effect_text.toLowerCase()
+      
+      // Check for common summon trigger phrases
+      const hasSummonTrigger = 
+        effectText.includes('when this card is summoned') ||
+        effectText.includes('when this card is normal summoned') ||
+        effectText.includes('if this card is summoned') ||
+        effectText.includes('if this card is normal summoned') ||
+        effectText.includes('when you normal summon this card') ||
+        effectText.includes('if you normal summon this card')
+      
+      if (hasSummonTrigger) {
+        toast.info(`${card.card_name} has a trigger effect! Click the card to activate.`, {
+          duration: 5000,
+        })
+      }
+    }
+    
     onCardsChanged()
 
     return { success: true }
@@ -563,6 +584,24 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
       .eq('id', cardId)
 
     toast.success(`Special Summoned ${card.card_name}!`)
+    
+    // Check for trigger effects on special summon
+    if (position !== 'face_down_defense' && card.effect_text) {
+      const effectText = card.effect_text.toLowerCase()
+      
+      const hasSpecialSummonTrigger = 
+        effectText.includes('when this card is special summoned') ||
+        effectText.includes('if this card is special summoned') ||
+        effectText.includes('when this card is summoned') ||
+        effectText.includes('if this card is summoned')
+      
+      if (hasSpecialSummonTrigger) {
+        toast.info(`${card.card_name} has a trigger effect! Click the card to activate.`, {
+          duration: 5000,
+        })
+      }
+    }
+    
     onCardsChanged()
     return { success: true }
   }, [allCards, myPlayerId, supabase, gameState?.turnCount, onCardsChanged])

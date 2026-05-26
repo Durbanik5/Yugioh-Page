@@ -282,6 +282,18 @@ export function DuelCard({
                 Flip Summon
               </Button>
             )}
+            {/* Activate monster effect - for face-up effect monsters */}
+            {!isFaceDown && onActivate && card.card_type === 'effect_monster' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-xs text-purple-400 hover:text-purple-500 hover:bg-purple-950/20"
+                onClick={() => handleAction(onActivate)}
+              >
+                <Sparkles className="mr-2 h-3.5 w-3.5" />
+                Activate Effect
+              </Button>
+            )}
             {!isFaceDown && onChangePosition && !showPositionOptions && (
               <Button
                 variant="ghost"
