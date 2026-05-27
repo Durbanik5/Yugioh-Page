@@ -387,13 +387,33 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     return { valid: true }
   }, [gameState, isMyTurn])
 
-  // Execute spell/trap activation (sends to GY after resolution for normal spells)
+  // Execute spell/trap/effect activation
   const executeSpellTrapActivation = useCallback(async (card: DuelGameCard) => {
-    const validation = validateSpellTrapActivation(card)
+    const isMonster = card.card_type === 'monster' || 
+                      ['fusion', 'synchro', 'xyz', 'link', 'pendulum'].includes(card.card_type || '')
     
-    if (!validation.valid) {
-      toast.error(validation.reason)
-      return { success: false, error: validation.reason }
+    // Skip validation for monster effects - just check if it's our turn
+    if (!isMonster) {
+      const validation = validateSpellTrapActivation(card)
+      
+      if (!validation.valid) {
+        toast.error(validation.reason)
+        return { success: false, error: validation.reason }
+      }
+    } else {
+      // Basic validation for monster effects
+      if (!isMyTurn) {
+        toast.error("It's not your turn")
+        return { success: false, error: "Not your turn" }
+      }
+    }
+    
+    // For monsters, just show effect and don't move them
+    if (isMonster) {
+      toast.success(`Activated ${card.card_name}'s effect!`)
+      toast.info(`Effect: ${card.effect_text?.substring(0, 150) || 'No effect text'}...`)
+      // Monster stays where it is - effects need to be resolved manually or via effect executor
+      return { success: true }
     }
 
     // For cards in hand, first move to spell zone face-up
@@ -414,35 +434,76 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
         toast.error('No empty Spell/Trap zones')
         return { success: false, error: 'No empty zones' }
       }
-
-      // Move to field then immediately to graveyard for normal spells
-      const { error } = await supabase
-        .from('duel_game_cards')
-        .update({
-          location: 'graveyard', // Normal spells go to GY after activation
-          zone_index: null,
-          position: 'face_up_attack',
-        })
-        .eq('id', card.id)
-
-      if (error) {
-        toast.error('Failed to activate')
-        return { success: false, error: 'Database error' }
+      
+      // Check if it's a continuous/equip/field spell - these stay on field
+      const staysOnField = card.card_type?.includes('continuous') || 
+                          card.card_type?.includes('equip') ||
+                          card.card_type?.includes('field')
+      
+      if (staysOnField) {
+        // Move to spell zone and keep there face-up
+        const { error } = await supabase
+          .from('duel_game_cards')
+          .update({
+            location: 'spell_zone',
+            zone_index: targetZone,
+            position: 'face_up_attack',
+          })
+          .eq('id', card.id)
+        
+        if (error) {
+          toast.error('Failed to activate')
+          return { success: false, error: 'Database error' }
+        }
+      } else {
+        // Normal spells go to GY after activation
+        const { error } = await supabase
+          .from('duel_game_cards')
+          .update({
+            location: 'graveyard',
+            zone_index: null,
+            position: 'face_up_attack',
+          })
+          .eq('id', card.id)
+        
+        if (error) {
+          toast.error('Failed to activate')
+          return { success: false, error: 'Database error' }
+        }
       }
     } else {
-      // Card is already set on field - activate and send to GY
-      const { error } = await supabase
-        .from('duel_game_cards')
-        .update({
-          location: 'graveyard',
-          zone_index: null,
-          position: 'face_up_attack',
-        })
-        .eq('id', card.id)
+      // Card is already set on field - activate and send to GY (unless continuous/equip)
+      const staysOnField = card.card_type?.includes('continuous') || 
+                          card.card_type?.includes('equip')
+      
+      if (staysOnField) {
+        // Just flip face-up
+        const { error } = await supabase
+          .from('duel_game_cards')
+          .update({
+            position: 'face_up_attack',
+          })
+          .eq('id', card.id)
+        
+        if (error) {
+          toast.error('Failed to activate')
+          return { success: false, error: 'Database error' }
+        }
+      } else {
+        // Send to GY
+        const { error } = await supabase
+          .from('duel_game_cards')
+          .update({
+            location: 'graveyard',
+            zone_index: null,
+            position: 'face_up_attack',
+          })
+          .eq('id', card.id)
 
-      if (error) {
-        toast.error('Failed to activate')
-        return { success: false, error: 'Database error' }
+        if (error) {
+          toast.error('Failed to activate')
+          return { success: false, error: 'Database error' }
+        }
       }
     }
 
@@ -451,7 +512,7 @@ export function useDuelEngine({ room, myPlayerId, allCards, onCardsChanged }: Us
     onCardsChanged()
 
     return { success: true }
-  }, [validateSpellTrapActivation, allCards, myPlayerId, supabase, onCardsChanged])
+  }, [validateSpellTrapActivation, allCards, myPlayerId, supabase, onCardsChanged, isMyTurn])
 
   // ========== EFFECT EXECUTION FUNCTIONS ==========
   

@@ -375,7 +375,7 @@ export function MasterDuelField({
             target.monsters[card.zone_index] = card
           }
           break
-        case 'spell_trap_zone':
+        case 'spell_zone':
           if (card.zone_index !== null && card.zone_index >= 0 && card.zone_index < 5) {
             target.spells[card.zone_index] = card
           }
@@ -452,8 +452,11 @@ export function MasterDuelField({
     
     if (!engineIsMyTurn) return actions
     
-    const isMonster = card.card_type?.toLowerCase().includes('monster')
-    const isSpellTrap = card.card_type?.toLowerCase().includes('spell') || card.card_type?.toLowerCase().includes('trap')
+    const isMonster = card.card_type?.toLowerCase().includes('monster') || 
+                      ['monster', 'fusion', 'synchro', 'xyz', 'link', 'pendulum'].includes(card.card_type || '')
+    const isSpellTrap = card.card_type?.toLowerCase().includes('spell') || card.card_type?.toLowerCase().includes('trap') ||
+                        ['spell', 'trap'].includes(card.card_type || '')
+    const hasEffect = !!card.effect_text && card.effect_text.length > 0
     const phase = gameState?.phase
     
     if (location === 'hand') {
@@ -463,6 +466,10 @@ export function MasterDuelField({
           actions.push({ id: 'summon_atk', label: 'Summon', icon: <Sword className="h-2 w-2" /> })
           actions.push({ id: 'summon_def', label: 'Def', icon: <Shield className="h-2 w-2" /> })
           actions.push({ id: 'set', label: 'Set', icon: <EyeOff className="h-2 w-2" /> })
+        }
+        // Hand-activated monster effects (like hand traps, quick effects from hand)
+        if (hasEffect && (phase === 'main1' || phase === 'main2')) {
+          actions.push({ id: 'activate', label: 'Effect', icon: <Sparkles className="h-2 w-2" /> })
         }
       }
       if (isSpellTrap && (phase === 'main1' || phase === 'main2')) {
@@ -486,8 +493,8 @@ export function MasterDuelField({
       if (card.position === 'face_up_defense' && !card.has_changed_position && (phase === 'main1' || phase === 'main2')) {
         actions.push({ id: 'change_atk', label: 'To ATK', icon: <Sword className="h-2 w-2" /> })
       }
-      // Effect monster activation
-      if (card.card_type === 'effect_monster' && card.position?.includes('face_up')) {
+      // Effect monster activation - check if card has effect text and is face-up
+      if (hasEffect && card.position?.includes('face_up') && (phase === 'main1' || phase === 'main2')) {
         actions.push({ id: 'activate', label: 'Effect', icon: <Sparkles className="h-2 w-2" /> })
       }
     }
