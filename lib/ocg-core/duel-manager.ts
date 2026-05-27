@@ -7,10 +7,27 @@
 
 'use client'
 
-// Dynamic import for WASM module - must be loaded at runtime in browser
+// Dynamic import for WASM module - must be loaded at runtime in browser only
+// We load from our copied dist files because the JSR package's mod.js
+// uses `export *` which doesn't re-export default exports
+let createCorePromise: Promise<typeof import('@n1xx1/ocgcore-wasm')['default']> | null = null
+
 const loadOcgCore = async () => {
-  const module = await import('@n1xx1/ocgcore-wasm')
-  return module.default
+  if (typeof window === 'undefined') {
+    throw new Error('OCG Core can only be loaded in browser')
+  }
+  
+  if (!createCorePromise) {
+    createCorePromise = (async () => {
+      // Import directly from the public folder - the WASM files have been
+      // rewritten to use absolute paths instead of relative imports
+      const module = await import(/* webpackIgnore: true */ '/wasm/index.js')
+      console.log('[v0] OCG module loaded, has default:', 'default' in module)
+      return module.default
+    })()
+  }
+  
+  return createCorePromise
 }
 
 import {
