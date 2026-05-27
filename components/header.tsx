@@ -1,6 +1,14 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen } from 'lucide-react'
+import { 
+  NavigationMenu, 
+  NavigationMenuContent, 
+  NavigationMenuItem, 
+  NavigationMenuLink, 
+  NavigationMenuList, 
+  NavigationMenuTrigger 
+} from '@/components/ui/navigation-menu'
+import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap } from 'lucide-react'
 
 export function Header() {
   return (
@@ -52,12 +60,66 @@ export function Header() {
               <span className="hidden sm:inline">Banlist</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
-            <Link href="/community" className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Community</span>
-            </Link>
-          </Button>
+          
+          {/* Community dropdown */}
+          <NavigationMenu>
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="h-8 px-3 text-sm text-muted-foreground hover:text-foreground bg-transparent hover:bg-accent data-[state=open]:bg-accent/50">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Community</span>
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-48 gap-1 p-2">
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/community/decks"
+                          className="flex items-center gap-3 rounded-md p-2 hover:bg-accent transition-colors"
+                        >
+                          <Layers className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Decks</span>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/community/market"
+                          className="flex items-center gap-3 rounded-md p-2 hover:bg-accent transition-colors"
+                        >
+                          <Store className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Market</span>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/community/trade"
+                          className="flex items-center gap-3 rounded-md p-2 hover:bg-accent transition-colors"
+                        >
+                          <ArrowLeftRight className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Trade</span>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/community/duel-academy"
+                          className="flex items-center gap-3 rounded-md p-2 hover:bg-accent transition-colors"
+                        >
+                          <GraduationCap className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Duel Academy</span>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
           <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
             <Link href="/news" className="flex items-center gap-2">
               <Newspaper className="h-4 w-4" />
