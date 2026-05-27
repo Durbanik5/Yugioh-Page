@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap, ChevronDown } from 'lucide-react'
+import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap, ChevronDown, Trophy, Medal } from 'lucide-react'
 
 export function Header() {
   return (
@@ -58,6 +58,18 @@ export function Header() {
             <Link href="/banlist" className="flex items-center gap-2">
               <Ban className="h-4 w-4" />
               <span className="hidden sm:inline">Banlist</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/leaderboards" className="flex items-center gap-2">
+              <Medal className="h-4 w-4" />
+              <span className="hidden sm:inline">Rankings</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/tournaments" className="flex items-center gap-2">
+              <Trophy className="h-4 w-4" />
+              <span className="hidden sm:inline">Tournaments</span>
             </Link>
           </Button>
           
