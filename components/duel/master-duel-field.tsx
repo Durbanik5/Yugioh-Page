@@ -336,7 +336,6 @@ export function MasterDuelField({
   const [showGraveyardViewer, setShowGraveyardViewer] = useState<'my' | 'opp' | null>(null)
   const [showBanishedViewer, setShowBanishedViewer] = useState<'my' | 'opp' | null>(null)
   const [showExtraDeckViewer, setShowExtraDeckViewer] = useState<boolean>(false)
-  const [hoveredCard, setHoveredCard] = useState<DuelGameCard | null>(null)
   
   // Use the duel engine
   const {
