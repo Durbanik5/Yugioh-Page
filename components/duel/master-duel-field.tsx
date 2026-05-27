@@ -534,10 +534,10 @@ export function MasterDuelField({
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900/50 via-blue-950/20 to-slate-900/50 opacity-50" />
       
       {/* Main field container */}
-      <div className="relative z-10 flex flex-col h-full p-2 gap-2">
+      <div className="relative z-10 flex flex-col h-full p-2 gap-1">
         
         {/* Opponent info bar */}
-        <div className="flex justify-between items-center px-4">
+        <div className="flex justify-between items-center px-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-slate-800 border-2 border-red-500 overflow-hidden">
               {opponentPlayer?.avatar_url && (
@@ -553,7 +553,7 @@ export function MasterDuelField({
         </div>
         
         {/* Opponent hand (face-down) */}
-        <div className="flex justify-center gap-1">
+        <div className="flex justify-center gap-1 flex-shrink-0 overflow-x-auto px-4">
           {organizedCards.opp.hand.map((card) => (
             <MasterDuelCard
               key={card.id}
@@ -569,13 +569,13 @@ export function MasterDuelField({
         </div>
         
         {/* Opponent field */}
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           {renderZoneRow(organizedCards.opp.spells, 'spell', true)}
           {renderZoneRow(organizedCards.opp.monsters, 'monster', true)}
         </div>
         
         {/* Center area - Phase indicator */}
-        <div className="flex justify-center py-2">
+        <div className="flex justify-center py-1 flex-shrink-0">
           {gameState && (
             <PhaseIndicator
               phase={gameState.phase}
@@ -587,13 +587,13 @@ export function MasterDuelField({
         </div>
         
         {/* My field */}
-        <div className="space-y-1">
+        <div className="space-y-1 flex-shrink-0">
           {renderZoneRow(organizedCards.my.monsters, 'monster', false)}
           {renderZoneRow(organizedCards.my.spells, 'spell', false)}
         </div>
         
         {/* My info bar */}
-        <div className="flex justify-between items-center px-4">
+        <div className="flex justify-between items-center px-4 flex-shrink-0">
           <LifePointsDisplay lp={myLifePoints} />
           <div className="flex items-center gap-3">
             <div>
@@ -609,7 +609,7 @@ export function MasterDuelField({
         </div>
         
         {/* My hand */}
-        <div className="flex justify-center gap-1 pb-2">
+        <div className="flex justify-center gap-1 pb-2 flex-shrink-0 overflow-x-auto px-4">
           {organizedCards.my.hand.map((card) => (
             <MasterDuelCard
               key={card.id}
