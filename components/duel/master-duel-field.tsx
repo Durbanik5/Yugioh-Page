@@ -13,6 +13,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -53,6 +59,7 @@ function MasterDuelCard({
   actions = [],
   isHighlighted = false,
   isAttackTarget = false,
+  onHover,
 }: {
   card: DuelGameCard
   isOwner: boolean
@@ -63,6 +70,7 @@ function MasterDuelCard({
   actions?: { id: string; label: string; icon?: React.ReactNode }[]
   isHighlighted?: boolean
   isAttackTarget?: boolean
+  onHover?: (card: DuelGameCard | null) => void
 }) {
   const [showActions, setShowActions] = useState(false)
   
@@ -92,8 +100,14 @@ function MasterDuelCard({
               isAttackTarget && 'ring-2 ring-red-500 animate-pulse',
               'hover:scale-110 hover:z-20 hover:shadow-lg hover:shadow-yellow-500/20'
             )}
-            onMouseEnter={() => setShowActions(true)}
-            onMouseLeave={() => setShowActions(false)}
+            onMouseEnter={() => {
+              setShowActions(true)
+              if (onHover && !isFaceDown) onHover(card)
+            }}
+            onMouseLeave={() => {
+              setShowActions(false)
+              if (onHover) onHover(null)
+            }}
           >
             <Image
               src={imageUrl}
@@ -320,6 +334,9 @@ export function MasterDuelField({
   const [attackingCard, setAttackingCard] = useState<DuelGameCard | null>(null)
   const [showDeckViewer, setShowDeckViewer] = useState(false)
   const [showGraveyardViewer, setShowGraveyardViewer] = useState<'my' | 'opp' | null>(null)
+  const [showBanishedViewer, setShowBanishedViewer] = useState<'my' | 'opp' | null>(null)
+  const [showExtraDeckViewer, setShowExtraDeckViewer] = useState<boolean>(false)
+  const [hoveredCard, setHoveredCard] = useState<DuelGameCard | null>(null)
   
   // Use the duel engine
   const {
@@ -545,6 +562,7 @@ export function MasterDuelField({
                   actions={!isOpponent ? getCardActions(card, type) : []}
                   onAction={(action) => handleCardAction(card, action)}
                   isAttackTarget={isTarget}
+                  onHover={!isFaceDown ? setHoveredCard : undefined}
                 />
               </div>
             )
@@ -666,6 +684,7 @@ export function MasterDuelField({
               size={handCardSize}
               actions={getCardActions(card, 'hand')}
               onAction={(action) => handleCardAction(card, action)}
+              onHover={setHoveredCard}
             />
           ))}
         </div>
@@ -694,16 +713,22 @@ export function MasterDuelField({
         {/* Right side - Extra deck, banished */}
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2">
           {/* Extra deck */}
-          <div className="w-12 h-16 bg-slate-800/80 rounded border border-purple-700 flex flex-col items-center justify-center">
+          <button 
+            onClick={() => setShowExtraDeckViewer(true)}
+            className="w-12 h-16 bg-slate-800/80 rounded border border-purple-700 flex flex-col items-center justify-center hover:bg-slate-700/80"
+          >
             <Layers className="h-4 w-4 text-purple-400" />
             <span className="text-[10px] text-slate-400">{organizedCards.my.extra.length}</span>
-          </div>
+          </button>
           
           {/* Banished */}
-          <div className="w-12 h-16 bg-slate-800/80 rounded border border-slate-700 flex flex-col items-center justify-center">
+          <button 
+            onClick={() => setShowBanishedViewer('my')}
+            className="w-12 h-16 bg-slate-800/80 rounded border border-slate-700 flex flex-col items-center justify-center hover:bg-slate-700/80"
+          >
             <Ban className="h-4 w-4 text-red-400" />
             <span className="text-[10px] text-slate-400">{organizedCards.my.banished.length}</span>
-          </div>
+          </button>
         </div>
         
         {/* Battle phase controls */}
@@ -747,26 +772,206 @@ export function MasterDuelField({
       
       {/* Graveyard Viewer Dialog */}
       <Dialog open={!!showGraveyardViewer} onOpenChange={() => setShowGraveyardViewer(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5 text-purple-400" />
               {showGraveyardViewer === 'my' ? 'Your' : "Opponent's"} Graveyard
+              <Badge variant="secondary" className="ml-2">
+                {(showGraveyardViewer === 'my' ? organizedCards.my.graveyard : organizedCards.opp.graveyard).length} cards
+              </Badge>
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="h-64">
-            <div className="grid grid-cols-4 gap-2 p-2">
-              {(showGraveyardViewer === 'my' ? organizedCards.my.graveyard : organizedCards.opp.graveyard).map(card => (
-                <MasterDuelCard
-                  key={card.id}
-                  card={card}
-                  isOwner={showGraveyardViewer === 'my'}
-                  size="sm"
-                />
-              ))}
-            </div>
-          </ScrollArea>
+          <div className="flex gap-4">
+            <ScrollArea className="h-80 flex-1">
+              <div className="grid grid-cols-4 gap-2 p-2">
+                {(showGraveyardViewer === 'my' ? organizedCards.my.graveyard : organizedCards.opp.graveyard).length === 0 ? (
+                  <p className="col-span-4 text-center text-muted-foreground py-8">Graveyard is empty</p>
+                ) : (
+                  (showGraveyardViewer === 'my' ? organizedCards.my.graveyard : organizedCards.opp.graveyard).map(card => (
+                    <MasterDuelCard
+                      key={card.id}
+                      card={card}
+                      isOwner={showGraveyardViewer === 'my'}
+                      size="sm"
+                      onHover={setHoveredCard}
+                    />
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+            {/* Card Preview Panel */}
+            {hoveredCard && (
+              <div className="w-48 flex-shrink-0 border-l border-border pl-4">
+                <div className="w-full aspect-[421/614] relative rounded overflow-hidden mb-2">
+                  <Image
+                    src={`https://images.ygoprodeck.com/images/cards/${hoveredCard.card_id}.jpg`}
+                    alt={hoveredCard.card_name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <h4 className="font-bold text-sm text-yellow-400">{hoveredCard.card_name}</h4>
+                <p className="text-xs text-muted-foreground capitalize mb-1">{hoveredCard.card_type?.replace(/_/g, ' ')}</p>
+                {hoveredCard.card_type?.includes('monster') && (
+                  <div className="flex gap-2 text-xs mb-2">
+                    <span className="text-yellow-500">Lv {hoveredCard.level}</span>
+                    <span className="text-red-400">ATK {hoveredCard.attack}</span>
+                    <span className="text-blue-400">DEF {hoveredCard.defense}</span>
+                  </div>
+                )}
+                <p className="text-xs text-slate-300 leading-relaxed">{hoveredCard.effect_text}</p>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Banished Viewer Dialog */}
+      <Dialog open={!!showBanishedViewer} onOpenChange={() => setShowBanishedViewer(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-5 w-5 text-red-400" />
+              {showBanishedViewer === 'my' ? 'Your' : "Opponent's"} Banished Zone
+              <Badge variant="secondary" className="ml-2">
+                {(showBanishedViewer === 'my' ? organizedCards.my.banished : organizedCards.opp.banished).length} cards
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-4">
+            <ScrollArea className="h-80 flex-1">
+              <div className="grid grid-cols-4 gap-2 p-2">
+                {(showBanishedViewer === 'my' ? organizedCards.my.banished : organizedCards.opp.banished).length === 0 ? (
+                  <p className="col-span-4 text-center text-muted-foreground py-8">Banished zone is empty</p>
+                ) : (
+                  (showBanishedViewer === 'my' ? organizedCards.my.banished : organizedCards.opp.banished).map(card => (
+                    <MasterDuelCard
+                      key={card.id}
+                      card={card}
+                      isOwner={showBanishedViewer === 'my'}
+                      size="sm"
+                      onHover={setHoveredCard}
+                    />
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+            {/* Card Preview Panel */}
+            {hoveredCard && (
+              <div className="w-48 flex-shrink-0 border-l border-border pl-4">
+                <div className="w-full aspect-[421/614] relative rounded overflow-hidden mb-2">
+                  <Image
+                    src={`https://images.ygoprodeck.com/images/cards/${hoveredCard.card_id}.jpg`}
+                    alt={hoveredCard.card_name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <h4 className="font-bold text-sm text-yellow-400">{hoveredCard.card_name}</h4>
+                <p className="text-xs text-muted-foreground capitalize mb-1">{hoveredCard.card_type?.replace(/_/g, ' ')}</p>
+                {hoveredCard.card_type?.includes('monster') && (
+                  <div className="flex gap-2 text-xs mb-2">
+                    <span className="text-yellow-500">Lv {hoveredCard.level}</span>
+                    <span className="text-red-400">ATK {hoveredCard.attack}</span>
+                    <span className="text-blue-400">DEF {hoveredCard.defense}</span>
+                  </div>
+                )}
+                <p className="text-xs text-slate-300 leading-relaxed">{hoveredCard.effect_text}</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Extra Deck Viewer Dialog */}
+      <Dialog open={showExtraDeckViewer} onOpenChange={setShowExtraDeckViewer}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-purple-400" />
+              Your Extra Deck
+              <Badge variant="secondary" className="ml-2">
+                {organizedCards.my.extra.length} cards
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-4">
+            <ScrollArea className="h-80 flex-1">
+              <div className="grid grid-cols-4 gap-2 p-2">
+                {organizedCards.my.extra.length === 0 ? (
+                  <p className="col-span-4 text-center text-muted-foreground py-8">Extra deck is empty</p>
+                ) : (
+                  organizedCards.my.extra.map(card => (
+                    <MasterDuelCard
+                      key={card.id}
+                      card={card}
+                      isOwner={true}
+                      size="sm"
+                      onHover={setHoveredCard}
+                    />
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+            {/* Card Preview Panel */}
+            {hoveredCard && (
+              <div className="w-48 flex-shrink-0 border-l border-border pl-4">
+                <div className="w-full aspect-[421/614] relative rounded overflow-hidden mb-2">
+                  <Image
+                    src={`https://images.ygoprodeck.com/images/cards/${hoveredCard.card_id}.jpg`}
+                    alt={hoveredCard.card_name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <h4 className="font-bold text-sm text-yellow-400">{hoveredCard.card_name}</h4>
+                <p className="text-xs text-muted-foreground capitalize mb-1">{hoveredCard.card_type?.replace(/_/g, ' ')}</p>
+                {hoveredCard.card_type?.includes('monster') && (
+                  <div className="flex gap-2 text-xs mb-2">
+                    <span className="text-yellow-500">Lv {hoveredCard.level}</span>
+                    <span className="text-red-400">ATK {hoveredCard.attack}</span>
+                    <span className="text-blue-400">DEF {hoveredCard.defense}</span>
+                  </div>
+                )}
+                <p className="text-xs text-slate-300 leading-relaxed">{hoveredCard.effect_text}</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Floating Card Preview Panel - shows on field hover */}
+      {hoveredCard && !showGraveyardViewer && !showBanishedViewer && !showExtraDeckViewer && (
+        <div className="fixed right-4 top-1/2 -translate-y-1/2 w-64 bg-slate-900/95 border border-slate-700 rounded-lg p-3 shadow-xl z-50 pointer-events-none">
+          <div className="w-full aspect-[421/614] relative rounded overflow-hidden mb-3">
+            <Image
+              src={`https://images.ygoprodeck.com/images/cards/${hoveredCard.card_id}.jpg`}
+              alt={hoveredCard.card_name}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+          <h4 className="font-bold text-base text-yellow-400 mb-1">{hoveredCard.card_name}</h4>
+          <p className="text-xs text-muted-foreground capitalize mb-2">{hoveredCard.card_type?.replace(/_/g, ' ')}</p>
+          {hoveredCard.card_type?.includes('monster') && (
+            <div className="flex gap-3 text-sm mb-2">
+              {hoveredCard.level && <span className="text-yellow-500">Level {hoveredCard.level}</span>}
+              <span className="text-red-400">ATK {hoveredCard.attack}</span>
+              <span className="text-blue-400">DEF {hoveredCard.defense}</span>
+            </div>
+          )}
+          {hoveredCard.effect_text && (
+            <ScrollArea className="h-32">
+              <p className="text-xs text-slate-300 leading-relaxed pr-2">{hoveredCard.effect_text}</p>
+            </ScrollArea>
+          )}
+        </div>
+      )}
     </div>
   )
 }
