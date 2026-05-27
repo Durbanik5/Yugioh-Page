@@ -21,7 +21,7 @@ import {
 import { 
   Sword, Shield, Sparkles, Flame, Eye, EyeOff, 
   RotateCcw, Layers, Ban, Heart, Zap, Target,
-  ChevronRight, Plus, Minus, Search
+  ChevronRight, Plus, Minus, Search, Maximize2, Minimize2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDuelEngine } from '@/hooks/use-duel-engine'
@@ -38,6 +38,8 @@ interface MasterDuelFieldProps {
   opponentLifePoints: number
   isMyTurn: boolean
   onCardsChanged: () => void
+  isFullscreen?: boolean
+  onToggleFullscreen?: () => void
 }
 
 // Master Duel style card component with hover effect text
@@ -56,7 +58,7 @@ function MasterDuelCard({
   isOwner: boolean
   isFaceDown?: boolean
   isDefense?: boolean
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   onAction?: (action: string) => void
   actions?: { id: string; label: string; icon?: React.ReactNode }[]
   isHighlighted?: boolean
@@ -65,7 +67,8 @@ function MasterDuelCard({
   const [showActions, setShowActions] = useState(false)
   
   const sizeClasses = {
-    sm: 'w-12 h-[70px]',
+    xs: 'w-8 h-[46px]',
+    sm: 'w-10 h-[58px]',
     md: 'w-16 h-[94px]',
     lg: 'w-20 h-[117px]',
   }
@@ -178,10 +181,12 @@ function MasterDuelCard({
 // Empty zone placeholder
 function EmptyZone({ 
   type, 
-  onClick 
+  onClick,
+  size = 'md'
 }: { 
   type: 'monster' | 'spell' | 'field' | 'extra' | 'pendulum'
-  onClick?: () => void 
+  onClick?: () => void
+  size?: 'xs' | 'sm' | 'md' | 'lg'
 }) {
   const colors = {
     monster: 'border-orange-900/30 bg-orange-950/10',
@@ -191,10 +196,18 @@ function EmptyZone({
     pendulum: 'border-blue-900/30 bg-blue-950/10',
   }
   
+  const sizeClasses = {
+    xs: 'w-8 h-[46px]',
+    sm: 'w-10 h-[58px]',
+    md: 'w-16 h-[94px]',
+    lg: 'w-20 h-[117px]',
+  }
+  
   return (
     <div 
       className={cn(
-        'w-16 h-[94px] rounded border-2 border-dashed',
+        'rounded border-2 border-dashed',
+        sizeClasses[size],
         colors[type],
         onClick && 'cursor-pointer hover:border-opacity-60'
       )}
@@ -299,6 +312,8 @@ export function MasterDuelField({
   opponentLifePoints,
   isMyTurn,
   onCardsChanged,
+  isFullscreen = false,
+  onToggleFullscreen,
 }: MasterDuelFieldProps) {
   const [hoveredCard, setHoveredCard] = useState<DuelGameCard | null>(null)
   const [selectedCard, setSelectedCard] = useState<DuelGameCard | null>(null)
@@ -486,6 +501,10 @@ export function MasterDuelField({
     return actions
   }, [engineIsMyTurn, gameState?.phase, validateNormalSummon])
   
+  // Card size based on fullscreen mode
+  const cardSize = isFullscreen ? 'sm' : 'md'
+  const handCardSize = isFullscreen ? 'xs' : 'sm'
+  
   // Handle attack target selection
   const handleAttackTarget = useCallback(async (target: DuelGameCard) => {
     if (attackingCard) {
@@ -515,6 +534,7 @@ export function MasterDuelField({
                   isOwner={!isOpponent}
                   isFaceDown={isFaceDown}
                   isDefense={isDefense}
+                  size={cardSize}
                   actions={!isOpponent ? getCardActions(card, type) : []}
                   onAction={(action) => handleCardAction(card, action)}
                   isAttackTarget={isTarget}
@@ -522,31 +542,52 @@ export function MasterDuelField({
               </div>
             )
           }
-          return <EmptyZone key={idx} type={type} />
+          return <EmptyZone key={idx} type={type} size={cardSize} />
         })}
       </div>
     )
   }
   
   return (
-    <div className="relative w-full h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
+    <div className={cn(
+      "relative bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden",
+      isFullscreen ? "fixed inset-0 z-50 w-screen h-screen" : "w-full h-full"
+    )}>
       {/* Field background pattern */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900/50 via-blue-950/20 to-slate-900/50 opacity-50" />
+      
+      {/* Fullscreen toggle button */}
+      {onToggleFullscreen && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-2 right-2 z-20 bg-slate-800/80 hover:bg-slate-700 text-white"
+          onClick={onToggleFullscreen}
+        >
+          {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+        </Button>
+      )}
       
       {/* Main field container */}
       <div className="relative z-10 flex flex-col h-full p-2 gap-1">
         
         {/* Opponent info bar */}
-        <div className="flex justify-between items-center px-4 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-slate-800 border-2 border-red-500 overflow-hidden">
+        <div className={cn(
+          "flex justify-between items-center px-4 flex-shrink-0",
+          isFullscreen && "py-0"
+        )}>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "rounded-full bg-slate-800 border-2 border-red-500 overflow-hidden",
+              isFullscreen ? "w-8 h-8" : "w-10 h-10"
+            )}>
               {opponentPlayer?.avatar_url && (
                 <Image src={opponentPlayer.avatar_url} alt="" width={40} height={40} />
               )}
             </div>
             <div>
-              <p className="text-sm font-bold text-white">{opponentPlayer?.nickname || 'Opponent'}</p>
-              <p className="text-xs text-slate-400">Deck: {organizedCards.opp.deck.length}</p>
+              <p className={cn("font-bold text-white", isFullscreen ? "text-xs" : "text-sm")}>{opponentPlayer?.nickname || 'Opponent'}</p>
+              <p className="text-[10px] text-slate-400">Deck: {organizedCards.opp.deck.length}</p>
             </div>
           </div>
           <LifePointsDisplay lp={opponentLifePoints} isOpponent />
@@ -560,7 +601,7 @@ export function MasterDuelField({
               card={card}
               isOwner={false}
               isFaceDown
-              size="sm"
+              size={handCardSize}
             />
           ))}
           {organizedCards.opp.hand.length === 0 && (
@@ -615,6 +656,7 @@ export function MasterDuelField({
               key={card.id}
               card={card}
               isOwner={true}
+              size={handCardSize}
               actions={getCardActions(card, 'hand')}
               onAction={(action) => handleCardAction(card, action)}
             />

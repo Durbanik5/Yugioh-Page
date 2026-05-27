@@ -22,6 +22,7 @@ import {
   Maximize2, Monitor, Hand, Layers, EyeOff, RotateCcw, ArrowLeftRight, UserCheck, Settings
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import type { Player, Deck, DuelRoom, DuelRoomParticipant, DuelRoomEvent, DuelRoomMessage, TurnPhase, DuelGameCard } from '@/lib/types'
 import { DuelField } from '@/components/duel/duel-field'
 import { MasterDuelField } from '@/components/duel/master-duel-field'
@@ -366,6 +367,8 @@ function SpectatorScreen({
   duelGameCards,
   isDuelist,
   fetchDuelGameCards,
+  isFieldFullscreen,
+  setIsFieldFullscreen,
 }: { 
   room: RoomData
   duelists: (DuelRoomParticipant & { player: Player; deck: Deck | null })[]
@@ -376,6 +379,8 @@ function SpectatorScreen({
   duelGameCards: DuelGameCard[]
   isDuelist: boolean
   fetchDuelGameCards: () => void
+  isFieldFullscreen: boolean
+  setIsFieldFullscreen: (value: boolean) => void
 }) {
   // Derive spectators from room participants
   const spectators = room.participants.filter(p => p.is_spectator)
@@ -608,7 +613,10 @@ function SpectatorScreen({
           const opponentDuelist = duelists.find(d => d.player_id !== viewerPlayerId)
           
           return (
-            <div className="absolute inset-4 top-20 bottom-20 flex items-center justify-center z-10">
+            <div className={cn(
+              "flex items-center justify-center z-10",
+              isFieldFullscreen ? "fixed inset-0 z-50" : "absolute inset-4 top-20 bottom-20"
+            )}>
               <MasterDuelField
                 room={room}
                 myPlayerId={viewerPlayerId}
@@ -620,6 +628,8 @@ function SpectatorScreen({
                 opponentLifePoints={opponentDuelist?.life_points || 8000}
                 isMyTurn={room.current_turn_player_id === viewerPlayerId}
                 onCardsChanged={fetchDuelGameCards}
+                isFullscreen={isFieldFullscreen}
+                onToggleFullscreen={() => setIsFieldFullscreen(!isFieldFullscreen)}
               />
             </div>
           )
@@ -778,6 +788,7 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
   const [duelGameCards, setDuelGameCards] = useState<DuelGameCard[]>([])
   const [deckInitialized, setDeckInitialized] = useState(false)
   const [showPlayField, setShowPlayField] = useState(true) // Toggle between classic and play field modes
+  const [isFieldFullscreen, setIsFieldFullscreen] = useState(false) // Fullscreen mode for duel field
   
   const chatEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -2189,17 +2200,19 @@ export default function DuelRoomPage({ params }: { params: Promise<{ id: string 
 
         {/* Main Spectator Screen */}
         <div className="mb-6">
-          <SpectatorScreen 
-                    room={room} 
-                    duelists={duelists} 
-                    currentTurnPlayer={currentTurnPlayer}
-                    showPlayField={showPlayField}
-                    setShowPlayField={setShowPlayField}
-                    selectedPlayer={selectedPlayer}
-                    duelGameCards={duelGameCards}
-                    isDuelist={isDuelist}
-                    fetchDuelGameCards={fetchDuelGameCards}
-                  />
+<SpectatorScreen
+                  room={room}
+                  duelists={duelists}
+                  currentTurnPlayer={currentTurnPlayer}
+                  showPlayField={showPlayField}
+                  setShowPlayField={setShowPlayField}
+                  selectedPlayer={selectedPlayer}
+                  duelGameCards={duelGameCards}
+                  isDuelist={isDuelist}
+                  fetchDuelGameCards={fetchDuelGameCards}
+                  isFieldFullscreen={isFieldFullscreen}
+                  setIsFieldFullscreen={setIsFieldFullscreen}
+                />
         </div>
 
         {/* Stream Embed (if available) */}
