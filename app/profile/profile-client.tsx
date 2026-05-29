@@ -177,10 +177,10 @@ export function ProfileClient({ profile: initialProfile }: ProfileClientProps) {
 
           {/* Tabbed Content */}
           <Tabs defaultValue="statistics" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
+            <TabsList className="grid w-full grid-cols-5 md:grid-cols-6">
               <TabsTrigger value="statistics">Statistics</TabsTrigger>
               <TabsTrigger value="decks">Decks</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
+              <TabsTrigger value="history">Match History</TabsTrigger>
               <TabsTrigger value="saved">Saved</TabsTrigger>
               <TabsTrigger value="achievements">Achievements</TabsTrigger>
               <TabsTrigger value="edit" className="hidden md:flex">Edit</TabsTrigger>
