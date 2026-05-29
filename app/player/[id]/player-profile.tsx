@@ -39,6 +39,14 @@ import { AddDeckDialog } from '@/components/add-deck-dialog'
 import { DeckBuildViewer } from '@/components/deck-build-viewer'
 import { MatchCard } from '@/components/match-card'
 import { PlayerCollection } from '@/components/player-collection'
+import { 
+  usePlayerAchievements, 
+  ATTRIBUTE_ACHIEVEMENTS, 
+  TYPE_ACHIEVEMENTS,
+  getTierForProgress,
+  getNextTierThreshold,
+  getTierColor
+} from '@/hooks/use-achievements'
 import { MVPCardDisplay } from '@/components/mvp-card-display'
 import { ProfileEditor } from '@/components/profile-editor'
 import { PROFILE_THEMES, YUGIOH_SERIES, CARD_MECHANICS, CARD_TYPES } from '@/lib/profile-themes'
@@ -248,6 +256,9 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
   const [formatFilter, setFormatFilter] = useState<DeckFormat | 'all'>('all')
   const router = useRouter()
   const supabase = createClient()
+  
+  // Fetch real achievement data from database
+  const { getProgress: getAchievementProgress, loading: achievementsLoading } = usePlayerAchievements(player.id)
   
   // Get theme config
   const theme = profile?.theme || 'kaiba'
@@ -1256,126 +1267,151 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
               <p className="text-sm text-muted-foreground">Track your playstyle and achievement progress</p>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="attributes" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-4">
-                  <TabsTrigger value="attributes">By Attribute</TabsTrigger>
-                  <TabsTrigger value="types">By Type</TabsTrigger>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                </TabsList>
+              {achievementsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <Tabs defaultValue="attributes" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-4">
+                    <TabsTrigger value="attributes">By Attribute</TabsTrigger>
+                    <TabsTrigger value="types">By Type</TabsTrigger>
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                  </TabsList>
 
-                {/* Attributes Tab */}
-                <TabsContent value="attributes" className="space-y-3">
-                  {[
-                    { id: 'dark', name: 'Shadow Master', attribute: 'DARK', icon: Moon, color: 'text-purple-400', progress: 127 },
-                    { id: 'light', name: 'Light Bringer', attribute: 'LIGHT', icon: Sun, color: 'text-yellow-300', progress: 85 },
-                    { id: 'fire', name: 'Inferno Caller', attribute: 'FIRE', icon: Flame, color: 'text-red-400', progress: 312 },
-                    { id: 'water', name: 'Tidal Ruler', attribute: 'WATER', icon: Droplets, color: 'text-blue-400', progress: 45 },
-                    { id: 'wind', name: 'Storm Weaver', attribute: 'WIND', icon: Wind, color: 'text-green-400', progress: 23 },
-                    { id: 'earth', name: 'Terra Former', attribute: 'EARTH', icon: Mountain, color: 'text-amber-600', progress: 156 },
-                    { id: 'divine', name: 'Divine Vessel', attribute: 'DIVINE', icon: Sparkles, color: 'text-yellow-200', progress: 3 },
-                  ].map((achievement) => {
-                    const tier = achievement.progress >= 2500 ? 'mythic' : achievement.progress >= 1000 ? 'legendary' : achievement.progress >= 500 ? 'platinum' : achievement.progress >= 250 ? 'gold' : achievement.progress >= 50 ? 'silver' : achievement.progress >= 10 ? 'bronze' : 'none'
-                    const nextThreshold = [10, 50, 250, 500, 1000, 2500].find(t => achievement.progress < t) || 2500
-                    const IconComponent = achievement.icon
-                    return (
-                      <div key={achievement.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-800">
-                        <div className="flex items-center gap-3 mb-2">
-                          <IconComponent className={`h-5 w-5 ${achievement.color}`} />
-                          <div className="flex-1">
-                            <h4 className="font-semibold">{achievement.name}</h4>
-                            <p className="text-xs text-muted-foreground">{achievement.attribute}</p>
-                          </div>
-                          <Badge className={
-                            tier === 'mythic' ? 'bg-gradient-to-r from-red-500 via-yellow-500 to-purple-500 text-white' :
-                            tier === 'legendary' ? 'bg-purple-500 text-purple-100' :
-                            tier === 'platinum' ? 'bg-cyan-400 text-cyan-900' :
-                            tier === 'gold' ? 'bg-yellow-500 text-yellow-900' :
-                            tier === 'silver' ? 'bg-slate-400 text-slate-900' :
-                            tier === 'bronze' ? 'bg-amber-700 text-amber-200' :
-                            'bg-slate-700 text-slate-400'
-                          }>
-                            {tier}
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{achievement.progress} / {nextThreshold}</span>
-                            <span className="text-muted-foreground">{Math.round((achievement.progress / nextThreshold) * 100)}%</span>
-                          </div>
-                          <Progress value={Math.min((achievement.progress / nextThreshold) * 100, 100)} className="h-2" />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </TabsContent>
-
-                {/* Types Tab */}
-                <TabsContent value="types" className="space-y-3">
-                  {[
-                    { id: 'dragon', name: 'Dragon Master', type: 'Dragon', icon: Flame, color: 'text-orange-400', progress: 89 },
-                    { id: 'spellcaster', name: 'Spellcaster Sage', type: 'Spellcaster', icon: Sparkles, color: 'text-violet-400', progress: 234 },
-                    { id: 'warrior', name: 'Warrior Champion', type: 'Warrior', icon: Swords, color: 'text-red-400', progress: 167 },
-                    { id: 'machine', name: 'Machine Engineer', type: 'Machine', icon: Zap, color: 'text-slate-400', progress: 78 },
-                    { id: 'fiend', name: 'Fiend Lord', type: 'Fiend', icon: Moon, color: 'text-purple-500', progress: 45 },
-                    { id: 'fairy', name: 'Fairy Guardian', type: 'Fairy', icon: Star, color: 'text-pink-400', progress: 12 },
-                    { id: 'zombie', name: 'Zombie Necromancer', type: 'Zombie', icon: Shield, color: 'text-gray-400', progress: 523 },
-                    { id: 'beast', name: 'Beast Tamer', type: 'Beast', icon: Target, color: 'text-amber-500', progress: 34 },
-                  ].map((achievement) => {
-                    const tier = achievement.progress >= 2500 ? 'mythic' : achievement.progress >= 1000 ? 'legendary' : achievement.progress >= 500 ? 'platinum' : achievement.progress >= 250 ? 'gold' : achievement.progress >= 50 ? 'silver' : achievement.progress >= 10 ? 'bronze' : 'none'
-                    const nextThreshold = [10, 50, 250, 500, 1000, 2500].find(t => achievement.progress < t) || 2500
-                    const IconComponent = achievement.icon
-                    return (
-                      <div key={achievement.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-800">
-                        <div className="flex items-center gap-3 mb-2">
-                          <IconComponent className={`h-5 w-5 ${achievement.color}`} />
-                          <div className="flex-1">
-                            <h4 className="font-semibold">{achievement.name}</h4>
-                            <p className="text-xs text-muted-foreground">{achievement.type}</p>
-                          </div>
-                          <Badge className={
-                            tier === 'mythic' ? 'bg-gradient-to-r from-red-500 via-yellow-500 to-purple-500 text-white' :
-                            tier === 'legendary' ? 'bg-purple-500 text-purple-100' :
-                            tier === 'platinum' ? 'bg-cyan-400 text-cyan-900' :
-                            tier === 'gold' ? 'bg-yellow-500 text-yellow-900' :
-                            tier === 'silver' ? 'bg-slate-400 text-slate-900' :
-                            tier === 'bronze' ? 'bg-amber-700 text-amber-200' :
-                            'bg-slate-700 text-slate-400'
-                          }>
-                            {tier}
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{achievement.progress} / {nextThreshold}</span>
-                            <span className="text-muted-foreground">{Math.round((achievement.progress / nextThreshold) * 100)}%</span>
-                          </div>
-                          <Progress value={Math.min((achievement.progress / nextThreshold) * 100, 100)} className="h-2" />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </TabsContent>
-
-                {/* Overview Tab */}
-                <TabsContent value="overview">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {/* Attributes Tab */}
+                  <TabsContent value="attributes" className="space-y-3">
                     {[
-                      { tier: 'none', label: 'Locked', color: 'bg-slate-700 text-slate-400', count: 2 },
-                      { tier: 'bronze', label: 'Bronze', color: 'bg-amber-700 text-amber-200', count: 5 },
-                      { tier: 'silver', label: 'Silver', color: 'bg-slate-400 text-slate-900', count: 3 },
-                      { tier: 'gold', label: 'Gold', color: 'bg-yellow-500 text-yellow-900', count: 2 },
-                      { tier: 'platinum', label: 'Platinum', color: 'bg-cyan-400 text-cyan-900', count: 1 },
-                      { tier: 'legendary', label: 'Legendary', color: 'bg-purple-500 text-purple-100', count: 1 },
-                      { tier: 'mythic', label: 'Mythic', color: 'bg-gradient-to-r from-red-500 via-yellow-500 to-purple-500 text-white', count: 1 },
-                    ].map(({ tier, label, color, count }) => (
-                      <div key={tier} className={`p-4 rounded-lg ${color} text-center`}>
-                        <p className="text-2xl font-bold">{count}</p>
-                        <p className="text-sm">{label}</p>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                      { id: 'dark', name: 'Shadow Master', key: 'DARK', icon: Moon, color: 'text-purple-400' },
+                      { id: 'light', name: 'Light Bringer', key: 'LIGHT', icon: Sun, color: 'text-yellow-300' },
+                      { id: 'fire', name: 'Inferno Caller', key: 'FIRE', icon: Flame, color: 'text-red-400' },
+                      { id: 'water', name: 'Tidal Ruler', key: 'WATER', icon: Droplets, color: 'text-blue-400' },
+                      { id: 'wind', name: 'Storm Weaver', key: 'WIND', icon: Wind, color: 'text-green-400' },
+                      { id: 'earth', name: 'Terra Former', key: 'EARTH', icon: Mountain, color: 'text-amber-600' },
+                      { id: 'divine', name: 'Divine Vessel', key: 'DIVINE', icon: Sparkles, color: 'text-yellow-200' },
+                    ].map((achievement) => {
+                      const progress = getAchievementProgress('attribute', achievement.key)
+                      const tier = getTierForProgress(progress)
+                      const nextThreshold = getNextTierThreshold(progress)
+                      const IconComponent = achievement.icon
+                      return (
+                        <div key={achievement.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-800">
+                          <div className="flex items-center gap-3 mb-2">
+                            <IconComponent className={`h-5 w-5 ${achievement.color}`} />
+                            <div className="flex-1">
+                              <h4 className="font-semibold">{achievement.name}</h4>
+                              <p className="text-xs text-muted-foreground">{achievement.key}</p>
+                            </div>
+                            <Badge className={getTierColor(tier)}>
+                              {tier}
+                            </Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">{progress} / {nextThreshold}</span>
+                              <span className="text-muted-foreground">{nextThreshold > 0 ? Math.round((progress / nextThreshold) * 100) : 0}%</span>
+                            </div>
+                            <Progress value={nextThreshold > 0 ? Math.min((progress / nextThreshold) * 100, 100) : 0} className="h-2" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </TabsContent>
+
+                  {/* Types Tab */}
+                  <TabsContent value="types" className="space-y-3">
+                    {[
+                      { id: 'aqua', name: 'Aqua Master', key: 'Aqua', icon: Droplets, color: 'text-cyan-400' },
+                      { id: 'beast', name: 'Beast Tamer', key: 'Beast', icon: Target, color: 'text-amber-500' },
+                      { id: 'beast_warrior', name: 'Beast-Warrior Hunter', key: 'Beast-Warrior', icon: Swords, color: 'text-orange-500' },
+                      { id: 'cyberse', name: 'Cyberse Hacker', key: 'Cyberse', icon: Zap, color: 'text-cyan-300' },
+                      { id: 'dinosaur', name: 'Dinosaur Excavator', key: 'Dinosaur', icon: Mountain, color: 'text-amber-700' },
+                      { id: 'divine_beast', name: 'Divine-Beast Chosen', key: 'Divine-Beast', icon: Crown, color: 'text-yellow-200' },
+                      { id: 'dragon', name: 'Dragon Master', key: 'Dragon', icon: Flame, color: 'text-orange-400' },
+                      { id: 'fairy', name: 'Fairy Guardian', key: 'Fairy', icon: Star, color: 'text-pink-400' },
+                      { id: 'fiend', name: 'Fiend Lord', key: 'Fiend', icon: Moon, color: 'text-purple-500' },
+                      { id: 'fish', name: 'Fish Angler', key: 'Fish', icon: Droplets, color: 'text-blue-300' },
+                      { id: 'insect', name: 'Insect Collector', key: 'Insect', icon: Target, color: 'text-green-500' },
+                      { id: 'machine', name: 'Machine Engineer', key: 'Machine', icon: Zap, color: 'text-slate-400' },
+                      { id: 'plant', name: 'Plant Cultivator', key: 'Plant', icon: Wind, color: 'text-green-400' },
+                      { id: 'psychic', name: 'Psychic Duelist', key: 'Psychic', icon: Sparkles, color: 'text-pink-300' },
+                      { id: 'pyro', name: 'Pyro Igniter', key: 'Pyro', icon: Flame, color: 'text-red-500' },
+                      { id: 'reptile', name: 'Reptile Handler', key: 'Reptile', icon: Shield, color: 'text-green-600' },
+                      { id: 'rock', name: 'Rock Breaker', key: 'Rock', icon: Mountain, color: 'text-stone-400' },
+                      { id: 'sea_serpent', name: 'Sea Serpent Sailor', key: 'Sea Serpent', icon: Droplets, color: 'text-blue-500' },
+                      { id: 'spellcaster', name: 'Spellcaster Sage', key: 'Spellcaster', icon: Sparkles, color: 'text-violet-400' },
+                      { id: 'thunder', name: 'Thunder Striker', key: 'Thunder', icon: Zap, color: 'text-yellow-400' },
+                      { id: 'warrior', name: 'Warrior Champion', key: 'Warrior', icon: Swords, color: 'text-red-400' },
+                      { id: 'winged_beast', name: 'Winged Beast Falconer', key: 'Winged Beast', icon: Wind, color: 'text-sky-400' },
+                      { id: 'wyrm', name: 'Wyrm Tamer', key: 'Wyrm', icon: Sparkles, color: 'text-indigo-400' },
+                      { id: 'zombie', name: 'Zombie Necromancer', key: 'Zombie', icon: Shield, color: 'text-gray-400' },
+                    ].map((achievement) => {
+                      const progress = getAchievementProgress('monster_type', achievement.key)
+                      const tier = getTierForProgress(progress)
+                      const nextThreshold = getNextTierThreshold(progress)
+                      const IconComponent = achievement.icon
+                      return (
+                        <div key={achievement.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-800">
+                          <div className="flex items-center gap-3 mb-2">
+                            <IconComponent className={`h-5 w-5 ${achievement.color}`} />
+                            <div className="flex-1">
+                              <h4 className="font-semibold">{achievement.name}</h4>
+                              <p className="text-xs text-muted-foreground">{achievement.key}</p>
+                            </div>
+                            <Badge className={getTierColor(tier)}>
+                              {tier}
+                            </Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">{progress} / {nextThreshold}</span>
+                              <span className="text-muted-foreground">{nextThreshold > 0 ? Math.round((progress / nextThreshold) * 100) : 0}%</span>
+                            </div>
+                            <Progress value={nextThreshold > 0 ? Math.min((progress / nextThreshold) * 100, 100) : 0} className="h-2" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </TabsContent>
+
+                  {/* Overview Tab */}
+                  <TabsContent value="overview">
+                    {(() => {
+                      // Calculate tier counts from real data
+                      const allAchievements = [
+                        ...['DARK', 'LIGHT', 'FIRE', 'WATER', 'WIND', 'EARTH', 'DIVINE'].map(key => ({ type: 'attribute', key })),
+                        ...['Aqua', 'Beast', 'Beast-Warrior', 'Cyberse', 'Dinosaur', 'Divine-Beast', 'Dragon', 'Fairy', 'Fiend', 'Fish', 'Insect', 'Machine', 'Plant', 'Psychic', 'Pyro', 'Reptile', 'Rock', 'Sea Serpent', 'Spellcaster', 'Thunder', 'Warrior', 'Winged Beast', 'Wyrm', 'Zombie'].map(key => ({ type: 'monster_type', key })),
+                      ]
+                      
+                      const tierCounts = { none: 0, bronze: 0, silver: 0, gold: 0, platinum: 0, legendary: 0, mythic: 0 }
+                      allAchievements.forEach(({ type, key }) => {
+                        const progress = getAchievementProgress(type, key)
+                        const tier = getTierForProgress(progress)
+                        tierCounts[tier]++
+                      })
+                      
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {[
+                            { tier: 'none' as const, label: 'Locked', color: 'bg-slate-700 text-slate-400' },
+                            { tier: 'bronze' as const, label: 'Bronze', color: 'bg-amber-700 text-amber-200' },
+                            { tier: 'silver' as const, label: 'Silver', color: 'bg-slate-400 text-slate-900' },
+                            { tier: 'gold' as const, label: 'Gold', color: 'bg-yellow-500 text-yellow-900' },
+                            { tier: 'platinum' as const, label: 'Platinum', color: 'bg-cyan-400 text-cyan-900' },
+                            { tier: 'legendary' as const, label: 'Legendary', color: 'bg-purple-500 text-purple-100' },
+                            { tier: 'mythic' as const, label: 'Mythic', color: 'bg-gradient-to-r from-red-500 via-yellow-500 to-purple-500 text-white' },
+                          ].map(({ tier, label, color }) => (
+                            <div key={tier} className={`p-4 rounded-lg ${color} text-center`}>
+                              <p className="text-2xl font-bold">{tierCounts[tier]}</p>
+                              <p className="text-sm">{label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </TabsContent>
+                </Tabs>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
