@@ -123,16 +123,32 @@ const ATTRIBUTE_ACHIEVEMENTS = [
   },
 ]
 
-// Monster type achievements
+// Monster type achievements - All official Yu-Gi-Oh! monster types
 const TYPE_ACHIEVEMENTS = [
-  { id: 'dragon_master', name: 'Dragon Master', type: 'Dragon', requirement: 'Summon Dragon-type monsters', icon: Flame, color: 'text-orange-400' },
-  { id: 'spellcaster_sage', name: 'Spellcaster Sage', type: 'Spellcaster', requirement: 'Summon Spellcaster-type monsters', icon: Sparkles, color: 'text-violet-400' },
-  { id: 'warrior_champion', name: 'Warrior Champion', type: 'Warrior', requirement: 'Summon Warrior-type monsters', icon: Swords, color: 'text-red-400' },
-  { id: 'machine_engineer', name: 'Machine Engineer', type: 'Machine', requirement: 'Summon Machine-type monsters', icon: Zap, color: 'text-slate-400' },
-  { id: 'fiend_lord', name: 'Fiend Lord', type: 'Fiend', requirement: 'Summon Fiend-type monsters', icon: Moon, color: 'text-purple-500' },
-  { id: 'fairy_guardian', name: 'Fairy Guardian', type: 'Fairy', requirement: 'Summon Fairy-type monsters', icon: Star, color: 'text-pink-400' },
-  { id: 'zombie_necromancer', name: 'Zombie Necromancer', type: 'Zombie', requirement: 'Summon Zombie-type monsters', icon: Shield, color: 'text-gray-400' },
+  { id: 'aqua_master', name: 'Aqua Master', type: 'Aqua', requirement: 'Summon Aqua-type monsters', icon: Droplets, color: 'text-cyan-400' },
   { id: 'beast_tamer', name: 'Beast Tamer', type: 'Beast', requirement: 'Summon Beast-type monsters', icon: Target, color: 'text-amber-500' },
+  { id: 'beast_warrior_hunter', name: 'Beast-Warrior Hunter', type: 'Beast-Warrior', requirement: 'Summon Beast-Warrior-type monsters', icon: Swords, color: 'text-orange-500' },
+  { id: 'cyberse_hacker', name: 'Cyberse Hacker', type: 'Cyberse', requirement: 'Summon Cyberse-type monsters', icon: Zap, color: 'text-cyan-300' },
+  { id: 'dinosaur_excavator', name: 'Dinosaur Excavator', type: 'Dinosaur', requirement: 'Summon Dinosaur-type monsters', icon: Mountain, color: 'text-amber-700' },
+  { id: 'divine_beast_chosen', name: 'Divine-Beast Chosen', type: 'Divine-Beast', requirement: 'Summon Divine-Beast-type monsters', icon: Crown, color: 'text-yellow-200' },
+  { id: 'dragon_master', name: 'Dragon Master', type: 'Dragon', requirement: 'Summon Dragon-type monsters', icon: Flame, color: 'text-orange-400' },
+  { id: 'fairy_guardian', name: 'Fairy Guardian', type: 'Fairy', requirement: 'Summon Fairy-type monsters', icon: Star, color: 'text-pink-400' },
+  { id: 'fiend_lord', name: 'Fiend Lord', type: 'Fiend', requirement: 'Summon Fiend-type monsters', icon: Moon, color: 'text-purple-500' },
+  { id: 'fish_angler', name: 'Fish Angler', type: 'Fish', requirement: 'Summon Fish-type monsters', icon: Droplets, color: 'text-blue-300' },
+  { id: 'insect_collector', name: 'Insect Collector', type: 'Insect', requirement: 'Summon Insect-type monsters', icon: Target, color: 'text-green-500' },
+  { id: 'machine_engineer', name: 'Machine Engineer', type: 'Machine', requirement: 'Summon Machine-type monsters', icon: Zap, color: 'text-slate-400' },
+  { id: 'plant_cultivator', name: 'Plant Cultivator', type: 'Plant', requirement: 'Summon Plant-type monsters', icon: Wind, color: 'text-green-400' },
+  { id: 'psychic_duelist', name: 'Psychic Duelist', type: 'Psychic', requirement: 'Summon Psychic-type monsters', icon: Sparkles, color: 'text-pink-300' },
+  { id: 'pyro_igniter', name: 'Pyro Igniter', type: 'Pyro', requirement: 'Summon Pyro-type monsters', icon: Flame, color: 'text-red-500' },
+  { id: 'reptile_handler', name: 'Reptile Handler', type: 'Reptile', requirement: 'Summon Reptile-type monsters', icon: Shield, color: 'text-green-600' },
+  { id: 'rock_breaker', name: 'Rock Breaker', type: 'Rock', requirement: 'Summon Rock-type monsters', icon: Mountain, color: 'text-stone-400' },
+  { id: 'sea_serpent_sailor', name: 'Sea Serpent Sailor', type: 'Sea Serpent', requirement: 'Summon Sea Serpent-type monsters', icon: Droplets, color: 'text-blue-500' },
+  { id: 'spellcaster_sage', name: 'Spellcaster Sage', type: 'Spellcaster', requirement: 'Summon Spellcaster-type monsters', icon: Sparkles, color: 'text-violet-400' },
+  { id: 'thunder_striker', name: 'Thunder Striker', type: 'Thunder', requirement: 'Summon Thunder-type monsters', icon: Zap, color: 'text-yellow-400' },
+  { id: 'warrior_champion', name: 'Warrior Champion', type: 'Warrior', requirement: 'Summon Warrior-type monsters', icon: Swords, color: 'text-red-400' },
+  { id: 'winged_beast_falconer', name: 'Winged Beast Falconer', type: 'Winged Beast', requirement: 'Summon Winged Beast-type monsters', icon: Wind, color: 'text-sky-400' },
+  { id: 'wyrm_tamer', name: 'Wyrm Tamer', type: 'Wyrm', requirement: 'Summon Wyrm-type monsters', icon: Sparkles, color: 'text-indigo-400' },
+  { id: 'zombie_necromancer', name: 'Zombie Necromancer', type: 'Zombie', requirement: 'Summon Zombie-type monsters', icon: Shield, color: 'text-gray-400' },
 ]
 
 // Summoning method achievements
