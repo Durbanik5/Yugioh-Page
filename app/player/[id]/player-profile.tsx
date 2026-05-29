@@ -50,6 +50,7 @@ import {
 import { MVPCardDisplay } from '@/components/mvp-card-display'
 import { ProfileEditor } from '@/components/profile-editor'
 import { PROFILE_THEMES, YUGIOH_SERIES, CARD_MECHANICS, CARD_TYPES } from '@/lib/profile-themes'
+import { TEAMS, getTeamBadgeClasses, getTeamName } from '@/lib/teams'
 import type { PlayerWithStats, MatchWithParticipants, Player, Deck, DeckFormat, SavedMatch, PlayerProfile as PlayerProfileType } from '@/lib/types'
 
 interface PlayerProfileProps {
@@ -529,12 +530,13 @@ export function PlayerProfile({ player, matches, allPlayers, savedMatches, profi
                     >
                       {player.nickname}
                     </h1>
-                    <Badge 
-                      className="text-xs"
-                      style={{ backgroundColor: themeConfig.colors.primary, color: '#fff' }}
-                    >
-                      {themeConfig.name}
-                    </Badge>
+                    {profile?.team && (
+                      <Badge 
+                        className={`text-xs font-semibold ${getTeamBadgeClasses(profile.team)}`}
+                      >
+                        {getTeamName(profile.team)}
+                      </Badge>
+                    )}
                   </div>
                   
                   {/* Bio */}

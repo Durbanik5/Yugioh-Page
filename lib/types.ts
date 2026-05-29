@@ -10,6 +10,8 @@ export interface Player {
 
 export type DeckFormat = 'tcg' | 'ocg' | 'casual'
 
+export type PlayerTeam = 'slifer_red' | 'ra_yellow' | 'obelisk_blue'
+
 export interface Deck {
   id: string
   player_id: string
@@ -317,6 +319,7 @@ export interface PlayerProfile {
   favorite_card_name: string | null
   rival_id: string | null
   theme: ProfileTheme
+  team: PlayerTeam | null
   banner_url: string | null
   created_at: string
   updated_at: string

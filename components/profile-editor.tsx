@@ -36,12 +36,14 @@ import {
   CARD_TYPES,
   type ThemeConfig 
 } from '@/lib/profile-themes'
+import { TEAMS, getTeamName, getTeamBadgeClasses } from '@/lib/teams'
 import type { 
   PlayerProfile, 
   ProfileTheme, 
   YugiohSeries, 
   CardMechanic, 
   CardType,
+  PlayerTeam,
   Player,
   DeckWithCards 
 } from '@/lib/types'
@@ -67,6 +69,7 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly =
   const [favoriteCardType, setFavoriteCardType] = useState<CardType | ''>(profile?.favorite_card_type || '')
   const [favoriteCardName, setFavoriteCardName] = useState(profile?.favorite_card_name || '')
   const [rivalId, setRivalId] = useState(profile?.rival_id || '')
+  const [team, setTeam] = useState<PlayerTeam | ''>(profile?.team || '')
   const [theme, setTheme] = useState<ProfileTheme>(profile?.theme || 'kaiba')
   const [bannerUrl, setBannerUrl] = useState(profile?.banner_url || '')
 
@@ -79,6 +82,7 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly =
     setFavoriteCardType(profile?.favorite_card_type || '')
     setFavoriteCardName(profile?.favorite_card_name || '')
     setRivalId(profile?.rival_id || '')
+    setTeam(profile?.team || '')
     setTheme(profile?.theme || 'kaiba')
     setBannerUrl(profile?.banner_url || '')
   }, [profile])
@@ -97,6 +101,7 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly =
         favorite_card_type: favoriteCardType || null,
         favorite_card_name: favoriteCardName.trim() || null,
         rival_id: rivalId || null,
+        team: team || null,
         theme,
         banner_url: bannerUrl.trim() || null,
         updated_at: new Date().toISOString(),
@@ -161,7 +166,7 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly =
         </DialogHeader>
 
         <Tabs defaultValue="about" className="mt-4">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="about" className="text-xs">
               <User className="h-3 w-3 mr-1" />
               About
@@ -173,6 +178,10 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly =
             <TabsTrigger value="rival" className="text-xs">
               <Swords className="h-3 w-3 mr-1" />
               Rival
+            </TabsTrigger>
+            <TabsTrigger value="team" className="text-xs">
+              <Shield className="h-3 w-3 mr-1" />
+              Team
             </TabsTrigger>
             <TabsTrigger value="theme" className="text-xs">
               <Palette className="h-3 w-3 mr-1" />
@@ -346,6 +355,77 @@ export function ProfileEditor({ playerId, profile, decks, allPlayers, iconOnly =
                         Your head-to-head record will be shown on your profile
                       </p>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Team Tab */}
+          <TabsContent value="team" className="space-y-4 mt-4">
+            <div className="space-y-3">
+              <Label>Duel Academy Team</Label>
+              <div className="grid grid-cols-1 gap-3">
+                {Object.values(TEAMS).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTeam(t.id)}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      team === t.id 
+                        ? 'border-primary ring-2 ring-primary/30 bg-primary/10' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                    style={{
+                      backgroundColor: team === t.id ? `${t.colors.primary}15` : undefined,
+                    }}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">{t.icon}</span>
+                      <div className="flex-1">
+                        <span className="font-semibold text-lg" style={{ color: t.colors.primary }}>
+                          {t.name}
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {t.school}
+                        </p>
+                      </div>
+                      {team === t.id && (
+                        <Badge className="text-xs bg-primary">Selected</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {t.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {team && (
+              <Card 
+                className="border-2 overflow-hidden"
+                style={{
+                  backgroundColor: TEAMS[team].colors.light,
+                  borderColor: TEAMS[team].colors.primary,
+                }}
+              >
+                <div 
+                  className="h-16 w-full"
+                  style={{
+                    backgroundColor: TEAMS[team].colors.primary,
+                  }}
+                />
+                <CardContent className="p-4">
+                  <p className="font-semibold mb-1" style={{ color: TEAMS[team].colors.primary }}>
+                    {TEAMS[team].name} - Team Preview
+                  </p>
+                  <p className="text-sm mb-3 text-muted-foreground">
+                    {TEAMS[team].description}
+                  </p>
+                  <div className="flex gap-2">
+                    <Badge style={{ backgroundColor: TEAMS[team].colors.primary, color: '#fff' }}>
+                      {TEAMS[team].name}
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
