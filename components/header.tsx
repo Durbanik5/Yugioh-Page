@@ -1,16 +1,31 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap, ChevronDown, Trophy, Medal } from 'lucide-react'
+import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap, ChevronDown, Trophy, Medal, LogIn, LogOut, Settings, User, Shield } from 'lucide-react'
+import { useUser } from '@/hooks/use-user'
+import { createClient } from '@/lib/supabase/client'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export function Header() {
+  const { user, profile, loading, isAdmin, isOwner } = useUser()
+  const router = useRouter()
+  const supabase = createClient()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-primary/30 bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -127,6 +142,60 @@ export function Header() {
               <span className="hidden sm:inline">Rules</span>
             </a>
           </Button>
+
+          {/* User menu */}
+          {loading ? (
+            <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+          ) : user && profile ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2 px-2">
+                  <Avatar className="h-7 w-7">
+                    <AvatarImage src={profile.avatar_url || undefined} />
+                    <AvatarFallback className="text-xs bg-primary/20 text-primary">
+                      {profile.display_name?.charAt(0).toUpperCase() || profile.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden sm:inline text-sm">{profile.display_name || profile.username}</span>
+                  {(isAdmin || isOwner) && (
+                    <Shield className="h-3 w-3 text-yellow-500" />
+                  )}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="flex items-center gap-3 cursor-pointer">
+                    <User className="h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                {(isAdmin || isOwner) && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="flex items-center gap-3 cursor-pointer">
+                        <Settings className="h-4 w-4 text-yellow-500" />
+                        <span>Admin Panel</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-3 cursor-pointer text-destructive">
+                  <LogOut className="h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="default" size="sm" asChild>
+              <Link href="/auth/login" className="flex items-center gap-2">
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Sign In</span>
+              </Link>
+            </Button>
+          )}
         </nav>
       </div>
     </header>

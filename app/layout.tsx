@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Orbitron, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
+import { UserProvider } from '@/hooks/use-user'
 import './globals.css'
 
 const orbitron = Orbitron({ 
@@ -49,8 +50,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background">
       <body className={`${orbitron.variable} ${geistMono.variable} font-sans antialiased`}>
-        {children}
-        <Toaster />
+        <UserProvider>
+          {children}
+          <Toaster />
+        </UserProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
