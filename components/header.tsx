@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap, ChevronDown, Trophy, Medal, LogIn, LogOut, Settings, User, Shield } from 'lucide-react'
+import { Swords, Users, Ban, Radio, Gamepad2, MessageCircle, Newspaper, BookOpen, Layers, Store, ArrowLeftRight, GraduationCap, ChevronDown, Trophy, Medal, LogIn, LogOut, Settings, User, Shield, Award } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -85,6 +85,12 @@ export function Header() {
             <Link href="/tournaments" className="flex items-center gap-2">
               <Trophy className="h-4 w-4" />
               <span className="hidden sm:inline">Tournaments</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+            <Link href="/achievements" className="flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              <span className="hidden sm:inline">Achievements</span>
             </Link>
           </Button>
           
